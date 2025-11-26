@@ -107,7 +107,7 @@ export const CART_SELECTORS = {
 
   // Resumen
   total: '.text-2xl.font-bold',
-  
+
   // Botones de acción
   continuar: '[data-testid="cart-continue-button"], [role="button"]:has-text("Continuar"), text=Continuar',
   procederAlPago: 'button:has-text("Proceder al pago")',
@@ -249,7 +249,7 @@ export const CATALOG_SELECTORS = {
 export const FOOTER_SELECTORS_OLD = {
   logo: 'img[alt="Logo Famiglia"]',
   copyright: 'text="© 2024 FAMIGLIA. Todos los derechos reservados."',
-  
+
   links: {
     quienesSomos: 'a:has-text("Quiénes Somos")',
     terminos: 'a:has-text("Términos y Condiciones")',
@@ -289,7 +289,7 @@ export const PREFERENCES_TEST_SELECTORS = {
   // Pregunta actual
   question: {
     title: 'h2.text-lg.sm\\:text-xl.font-semibold.text-\\[\\#6b2c2c\\]',
-    
+
     // Opciones de respuesta
     options: {
       container: '.space-y-3.sm\\:space-y-4.mb-6',
@@ -297,7 +297,7 @@ export const PREFERENCES_TEST_SELECTORS = {
       selected: 'button.border-\\[\\#6b2c2c\\].bg-\\[\\#f5e6d3\\]',
       label: '.font-medium.text-\\[\\#6b2c2c\\]',
       description: '.text-xs.sm\\:text-sm.text-\\[\\#6b2c2c\\].opacity-70',
-      
+
       // Selectores por índice (0-based)
       first: 'button.w-full.text-left:nth-of-type(1)',
       second: 'button.w-full.text-left:nth-of-type(2)',
@@ -325,7 +325,7 @@ export const PREFERENCES_TEST_SELECTORS = {
     title: 'h2:has-text("Tu Recomendación Personalizada")',
     productCard: '[class*="ProductCard"]',
     reasoning: 'p.text-sm.sm\\:text-base.text-\\[\\#6b2c2c\\]',
-    
+
     // Botones de acción
     goToCatalog: 'button:has-text("Ver Catálogo Completo")',
     restartTest: 'button:has-text("Hacer Test Nuevamente")',
@@ -461,6 +461,36 @@ export const CATALOGO_ADMIN_SELECTORS = {
 };
 
 /**
+ * Selectores de PedidosAdmin (/pedidos-admin)
+ */
+export const PEDIDOS_ADMIN_SELECTORS = {
+  title: 'h2:has-text("Panel de Administración de Pedidos")',
+  filters: {
+    reservados: 'button:has-text("Reservados")',
+    entregados: 'button:has-text("Entregados")',
+    cancelados: 'button:has-text("Cancelados")',
+    todos: 'button:has-text("Todos")',
+  },
+  search: {
+    input: 'input[placeholder="Buscar por cliente..."]',
+  },
+  orders: {
+    card: '.bg-white.rounded-lg.shadow-md.p-4',
+    customerName: '.font-bold.text-lg',
+    status: '.px-2.py-1.rounded-full.text-xs',
+    total: '.font-bold.text-gray-800',
+    actions: {
+      entregar: 'button:has-text("Entregar")',
+      cancelar: 'button:has-text("Cancelar")',
+      verDetalles: 'button:has-text("Ver Detalles")',
+    },
+    // Selectores dinámicos por índice
+    getCardByIndex: (index) => `.bg-white.rounded-lg.shadow-md.p-4:nth-of-type(${index + 1})`,
+    getEntregarByIndex: (index) => `.bg-white.rounded-lg.shadow-md.p-4:nth-of-type(${index + 1}) button:has-text("Entregar")`,
+  },
+};
+
+/**
  * Obtiene el selector apropiado según el contexto
  * @param {string} element - Nombre del elemento (ej: "search.input", "cart.increase")
  * @param {string} currentUrl - URL actual para determinar contexto
@@ -502,6 +532,10 @@ export function getSelector(element, currentUrl = '/') {
     if (parts[0] === 'catalog') {
       return getNestedValue(CATALOG_SELECTORS, parts.slice(1));
     }
+  } else if (currentUrl.includes('/pedidos-admin')) {
+    if (parts[0] === 'pedidosAdmin') {
+      return getNestedValue(PEDIDOS_ADMIN_SELECTORS, parts.slice(1));
+    }
   }
 
   // Header y footer están en todas las páginas
@@ -535,7 +569,9 @@ export default {
   PREFERENCES_TEST_SELECTORS,
   COMPLAINTS_SELECTORS,
   DELIVERY_SELECTORS,
+  DELIVERY_SELECTORS,
   CATALOGO_ADMIN_SELECTORS,
+  PEDIDOS_ADMIN_SELECTORS,
   FOOTER_SELECTORS: FOOTER_SELECTORS_OLD,
   SELECTOR_GENERATORS,
   SELECTOR_UTILS,

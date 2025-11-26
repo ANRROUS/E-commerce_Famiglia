@@ -6,6 +6,9 @@ import { VoiceProvider } from "./context/VoiceContext";
 import { useLoginModal } from "./context/LoginModalContext";
 import LoginForm from "./components/forms/LoginForm";
 import { VoiceAvatarFloating } from "./components/voice/VoiceAvatarFloating";
+import { usePageGreeting } from "./hooks/usePageGreeting";
+import VoiceSettingsModal from "./components/common/VoiceSettingsModal";
+import { useVoice } from "./context/VoiceContext";
 import Home from "./pages/Home";
 import Footer from "./components/layout/Footer";
 import Header from "./components/layout/Header";
@@ -41,6 +44,27 @@ function Layout() {
   const dispatch = useDispatch();
   const { role } = useSelector((state) => state.auth);
   const { isLoginModalOpen, hideLoginModal } = useLoginModal();
+  const { isSettingsModalOpen, closeSettingsModal, openSettingsModal, registerCommands, unregisterCommands, speak } = useVoice();
+
+  // 1. Saludo contextual por página
+  usePageGreeting();
+
+  // 2. Registrar comandos globales de configuración
+  useEffect(() => {
+    const globalCommands = {
+      'configurar voz': () => {
+        openSettingsModal();
+        speak('Abriendo configuración de voz');
+      },
+      'cambiar voz': () => {
+        openSettingsModal();
+        speak('Abriendo configuración de voz');
+      }
+    };
+
+    registerCommands(globalCommands);
+    return () => unregisterCommands();
+  }, [registerCommands, unregisterCommands, openSettingsModal, speak]);
 
   const usuario = useSelector(state => state.auth.user);
   const usuarioId = usuario?.id || usuario?.id_usuario || null;
@@ -51,7 +75,7 @@ function Layout() {
       console.log('[React Router] Navegando via MCP:', route);
       navigate(route);
     };
-    
+
     return () => {
       delete window.__navigateViaReactRouter;
     };
@@ -157,7 +181,8 @@ function Layout() {
 
       <Footer />
       <LoginForm isOpen={isLoginModalOpen} onClose={hideLoginModal} />
-      
+      <VoiceSettingsModal isOpen={isSettingsModalOpen} onClose={closeSettingsModal} />
+
       {/* Avatar flotante de voz en esquina inferior derecha */}
       <VoiceAvatarFloating />
     </>

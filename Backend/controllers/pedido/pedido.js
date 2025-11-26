@@ -115,16 +115,18 @@ export const createPedido = async (req, res) => {
     try {
         for (const prod of productos) {
             const producto = await prisma.producto.findUnique({
-                where: { id_producto: BigInt(prod.id_producto) }
+                where: { id_producto: BigInt(prod.id_producto) },
+                include: { stock: true }
             });
 
             if (!producto) {
                 return res.status(404).json({ error: `Producto ${prod.id_producto} no encontrado` });
             }
 
-            if (producto.stock < prod.cantidad) {
+            const currentStock = producto.stock?.cantidad || 0;
+            if (currentStock < prod.cantidad) {
                 return res.status(400).json({
-                    error: `Stock insuficiente`
+                    error: `Stock insuficiente para ${producto.nombre}. Disponible: ${currentStock}`
                 });
             }
         }
@@ -178,13 +180,15 @@ export const addProductoToPedido = async (req, res) => {
 
         const producto = await prisma.producto.findUnique({
             where: { id_producto: BigInt(id_producto) },
+            include: { stock: true }
         });
         if (!producto) {
             return res.status(404).json({ error: "Producto no encontrado" });
         }
 
-        if (producto.stock < cantidad) {
-            return res.status(400).json({ error: "Stock insuficiente" });
+        const currentStock = producto.stock?.cantidad || 0;
+        if (currentStock < cantidad) {
+            return res.status(400).json({ error: `Stock insuficiente. Disponible: ${currentStock}` });
         }
 
         const detalleExistente = await prisma.detalle_pedido.findFirst({
@@ -232,7 +236,9 @@ export const updateCantidadFromDetallePedido = async (req, res) => {
             where: { id_detalle_pedido: BigInt(id_detalle_pedido) },
             include: {
                 pedido: true,
-                producto: true,
+                producto: {
+                    include: { stock: true }
+                },
             },
         });
         if (!detalle) {
@@ -241,8 +247,10 @@ export const updateCantidadFromDetallePedido = async (req, res) => {
         if (detalle.pedido.estado !== "Carrito") {
             return res.status(400).json({ error: "Solo se pueden modificar pedidos en estado Carrito" });
         }
-        if (detalle.producto.stock < cantidad) {
-            return res.status(400).json({ error: "Stock insuficiente" });
+
+        const currentStock = detalle.producto.stock?.cantidad || 0;
+        if (currentStock < cantidad) {
+            return res.status(400).json({ error: `Stock insuficiente. Disponible: ${currentStock}` });
         }
 
         const detalleActualizado = await prisma.detalle_pedido.update({
@@ -428,15 +436,15 @@ export const updatePedidoEstadoAdmin = async (req, res) => {
         logAuditoria({
             req,
             accion: normalizedEstado === 'entregado' ? 'Pedido entregado'
-                  : normalizedEstado === 'cancelado' ? 'Pedido cancelado'
-                  : 'restablecer pedido',
+                : normalizedEstado === 'cancelado' ? 'Pedido cancelado'
+                    : 'restablecer pedido',
             recurso: 'pedido',
             recursoId: String(id_pedido),
             meta: {
                 estadoPrevio: pedidoExistente.estado,
                 estadoNuevo: normalizedEstado,
                 usuarioPedidoId: pedidoActualizado.usuario?.id_usuario ? String(pedidoActualizado.usuario.id_usuario) : null,
-                cantidadProductos: (pedidoActualizado.detalle_pedido.length || []).length, 
+                cantidadProductos: (pedidoActualizado.detalle_pedido.length || []).length,
             }
         });
     } catch (error) {

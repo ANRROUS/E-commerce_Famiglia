@@ -4,6 +4,7 @@ import crypto from 'crypto-js';
 import { pedidoAPI } from '../services/api';
 import BuscadorProductos from '../components/common/BuscadorProductos';
 import PedidoCard from '../components/common/PedidoCard';
+import { useVoice } from '../context/VoiceContext';
 
 const FILTER_OPTIONS = [
   { label: 'Reservados', value: 'confirmado' },
@@ -22,6 +23,35 @@ export default function PedidosAdmin() {
   const [selectedEstado, setSelectedEstado] = useState(FILTER_OPTIONS[0].value);
   const [searchTerm, setSearchTerm] = useState('');
   const [updating, setUpdating] = useState(null);
+  const { registerCommands, unregisterCommands, speak } = useVoice();
+
+  useEffect(() => {
+    const commands = {
+      'mostrar reservados': () => {
+        setSelectedEstado('confirmado');
+        speak('Mostrando pedidos reservados');
+      },
+      'mostrar entregados': () => {
+        setSelectedEstado('entregado');
+        speak('Mostrando pedidos entregados');
+      },
+      'mostrar cancelados': () => {
+        setSelectedEstado('cancelado');
+        speak('Mostrando pedidos cancelados');
+      },
+      'buscar *': (term) => {
+        setSearchTerm(term);
+        speak(`Buscando pedidos con ${term}`);
+      },
+      'limpiar búsqueda': () => {
+        setSearchTerm('');
+        speak('Búsqueda limpiada');
+      }
+    };
+
+    registerCommands(commands);
+    return () => unregisterCommands();
+  }, [registerCommands, unregisterCommands, speak]);
 
   useEffect(() => {
     const fetchPedidos = async () => {
@@ -69,10 +99,10 @@ export default function PedidosAdmin() {
         const query = searchTerm.trim().toLowerCase();
         const fechaStr = pedido.fecha
           ? new Date(pedido.fecha).toLocaleDateString('es-PE', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            }).toLowerCase()
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          }).toLowerCase()
           : '';
 
         if (query.startsWith('#')) {
@@ -101,14 +131,14 @@ export default function PedidosAdmin() {
         prev.map((pedido) =>
           pedido.id_pedido === id_pedido
             ? {
-                ...pedido,
-                estado: (data.estado || estado).toLowerCase(),
-                codigo: data.codigo || pedido.codigo,
-                fecha: data.fecha ?? pedido.fecha,
-                usuario: data.usuario ?? pedido.usuario,
-                detalle_pedido: data.detalle_pedido ?? pedido.detalle_pedido,
-                pago: data.pago ?? pedido.pago,
-              }
+              ...pedido,
+              estado: (data.estado || estado).toLowerCase(),
+              codigo: data.codigo || pedido.codigo,
+              fecha: data.fecha ?? pedido.fecha,
+              usuario: data.usuario ?? pedido.usuario,
+              detalle_pedido: data.detalle_pedido ?? pedido.detalle_pedido,
+              pago: data.pago ?? pedido.pago,
+            }
             : pedido
         )
       );

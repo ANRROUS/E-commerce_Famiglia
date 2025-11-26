@@ -21,7 +21,7 @@ export const generateTest = async (req, res) => {
         promptLength: String((userPrompt || '').length),
       }
     });
-    
+
   } catch (error) {
     console.error('Error en generateTest:', error);
     res.status(500).json({
@@ -37,7 +37,7 @@ export const getRecommendation = async (req, res) => {
     const { userPrompt, questions, answers } = req.body;
     // Obtener id del token JWT (la propiedad es 'id', no 'id_usuario')
     const userId = req.user?.id || null;
-    
+
     console.log('👤 Usuario autenticado:', userId ? `ID: ${userId}` : 'No autenticado');
 
     if (!questions || !Array.isArray(questions)) {
@@ -54,18 +54,26 @@ export const getRecommendation = async (req, res) => {
       });
     }
 
-    const products = await prisma.producto.findMany();
+    const products = await prisma.producto.findMany({
+      include: {
+        stock: true,
+        categoria: true
+      }
+    });
 
-    if (!products || products.length === 0) {
+    // Filtrar solo productos con stock disponible
+    const availableProducts = products.filter(p => (p.stock?.cantidad || 0) > 0);
+
+    if (!availableProducts || availableProducts.length === 0) {
       return res.status(404).json({
         success: false,
-        error: 'No hay productos disponibles en la base de datos'
+        error: 'No hay productos disponibles en stock'
       });
     }
 
     const recommendation = await getProductRecommendation(
       { userPrompt, questions, answers },
-      products
+      availableProducts
     );
 
     // Guardar el test y la recomendación en la base de datos
@@ -104,13 +112,13 @@ export const getRecommendation = async (req, res) => {
         guardadoEnBD: Boolean(testRecord)
       }
     });
-  
+
 
     res.json({
       success: true,
       data: recommendation
     });
-    
+
   } catch (error) {
     console.error('Error en getRecommendation:', error);
     res.status(500).json({

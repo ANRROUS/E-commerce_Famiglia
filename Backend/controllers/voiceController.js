@@ -11,7 +11,7 @@ const logger = createModuleLogger('voiceController');
  */
 export const processVoiceCommand = async (req, res) => {
   const startTime = Date.now();
-  
+
   try {
     const { transcript, context, screenshot } = req.body;
 
@@ -51,7 +51,7 @@ export const processVoiceCommand = async (req, res) => {
     console.log(`[Voice Controller] ═══════════════════════════════════════`);
     console.log(`[Voice Controller] 🤖 Enviando comando completo a Gemini (sin conversiones)`);
 
-    // TODO pasa directamente a Gemini Ensemble (3 modelos)
+    // Usa Gemini Single Model con formato TOON (Optimizado)
     // Sin filtros, sin INTENT_MAPPING, sin conversiones de palabras
     const result = await interpretVoiceWithGemini(
       transcript,

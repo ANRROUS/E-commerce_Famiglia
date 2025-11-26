@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+import { credentialManager } from './credentialManager.js';
 
 // Importar selectores mapeados
 let SELECTORS = null;
@@ -79,8 +80,8 @@ async function initBrowser() {
         const appPages = pages.filter(p => {
           const url = p.url();
           return !url.includes('devtools://') &&
-                 !url.includes('chrome://') &&
-                 !url.includes('about:blank');
+            !url.includes('chrome://') &&
+            !url.includes('about:blank');
         });
 
         if (appPages.length > 0) {
@@ -629,6 +630,127 @@ const TOOLS = [
       },
       required: ['fields']
     }
+  },
+  {
+    name: 'openModal',
+    description: 'Abre un modal informativo (Términos, Privacidad, Quiénes somos)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          description: 'Tipo de modal a abrir (terms, privacy, about)',
+          enum: ['terms', 'privacy', 'about']
+        }
+      },
+      required: ['type']
+    }
+  },
+  {
+    name: 'openExternalLink',
+    description: 'Abre un enlace externo (WhatsApp, Maps, Redes Sociales)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: {
+          type: 'string',
+          description: 'Destino del enlace (whatsapp, maps, instagram, facebook)',
+          enum: ['whatsapp', 'maps', 'instagram', 'facebook']
+        }
+      },
+      required: ['target']
+    }
+  },
+  {
+    name: 'updateOrderStatus',
+    description: 'Actualiza el estado de un pedido (Solo Admin)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        orderId: {
+          type: 'string',
+          description: 'ID del pedido'
+        },
+        status: {
+          type: 'string',
+          description: 'Nuevo estado',
+          enum: ['PENDIENTE', 'PREPARANDO', 'EN_CAMINO', 'ENTREGADO', 'CANCELADO']
+        }
+      },
+      required: ['orderId', 'status']
+    }
+  },
+  {
+    name: 'updateProduct',
+    description: 'Actualiza un producto (Solo Admin)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        productId: {
+          type: 'string',
+          description: 'ID del producto'
+        },
+        updates: {
+          type: 'object',
+          description: 'Campos a actualizar (precio, stock, nombre)',
+          properties: {
+            precio: { type: 'number' },
+            stock: { type: 'number' },
+            nombre: { type: 'string' }
+          }
+        }
+      },
+      required: ['productId', 'updates']
+    }
+  },
+  {
+    name: 'saveLoginCredentials',
+    description: 'Guarda credenciales de inicio de sesión para uso futuro',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        alias: {
+          type: 'string',
+          description: 'Nombre o alias para identificar la cuenta (ej: "Juan", "Admin")'
+        },
+        email: {
+          type: 'string',
+          description: 'Correo electrónico'
+        },
+        password: {
+          type: 'string',
+          description: 'Contraseña'
+        },
+        role: {
+          type: 'string',
+          description: 'Rol del usuario (client o admin)',
+          enum: ['client', 'admin']
+        }
+      },
+      required: ['alias', 'email', 'password']
+    }
+  },
+  {
+    name: 'getSavedIdentities',
+    description: 'Obtiene la lista de identidades guardadas para sugerir inicio de sesión',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'autoLogin',
+    description: 'Inicia sesión automáticamente con una identidad guardada',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        alias: {
+          type: 'string',
+          description: 'Alias de la identidad a usar (ej: "Administrador")'
+        }
+      },
+      required: ['alias']
+    }
   }
 ];
 
@@ -639,33 +761,46 @@ const toolHandlers = {
   // NAVEGACIÓN
   async navigate({ url }) {
     const p = await initBrowser();
+
+    // INTERCEPCIÓN DE RUTAS ESPECIALES (MODALES)
+    if (url === '/login' || url === '/signin') {
+      console.log('[navigate] Interceptando /login -> Abriendo modal de Login');
+      const selector = SELECTORS?.HEADER_SELECTORS?.auth?.iniciarSesion || 'button:has-text("Iniciar Sesión")';
+      return await toolHandlers.click({ selector });
+    }
+
+    if (url === '/register' || url === '/signup') {
+      console.log('[navigate] Interceptando /register -> Abriendo modal de Registro');
+      const selector = SELECTORS?.HEADER_SELECTORS?.auth?.registrarse || 'button:has-text("Registrarse")';
+      return await toolHandlers.click({ selector });
+    }
+
+    if (url === '/logout' || url === '/signout') {
+      console.log('[navigate] Interceptando /logout -> Cerrando sesión');
+      const selector = SELECTORS?.HEADER_SELECTORS?.user?.cerrarSesion || 'button:has-text("Cerrar Sesión")';
+      return await toolHandlers.click({ selector });
+    }
+
     const fullUrl = url.startsWith('http') ? url : `${APP_URL}${url}`;
 
-    // NO usar page.goto() - esto recarga toda la página y pierde el estado de React
-    // En su lugar, usar el router de React via JavaScript
-    
-    // Si la URL es completa (con http), navegar normalmente
     if (url.startsWith('http')) {
       await p.goto(fullUrl, { waitUntil: 'networkidle' });
     } else {
-      // Para rutas relativas, usar React Router sin recargar
-      // Ejecutar código JS que llame a window.__navigateViaReactRouter
-      await p.evaluate((route) => {
-        // Usar React Router sin recargar la página
-        // El frontend debe exponer esta función en window
+      const success = await p.evaluate((route) => {
         if (window.__navigateViaReactRouter) {
           window.__navigateViaReactRouter(route);
-        } else {
-          // Fallback: usar history API (menos óptimo pero funciona)
-          window.history.pushState({}, '', route);
-          // Disparar evento popstate para que React Router detecte el cambio
-          window.dispatchEvent(new PopStateEvent('popstate'));
+          return true;
         }
+        return false;
       }, url);
-      
-      // Esperar a que el DOM se actualice
-      await p.waitForTimeout(500);
+
+      if (!success) {
+        await p.goto(fullUrl, { waitUntil: 'domcontentloaded' });
+      }
     }
+
+    // Esperar a que el DOM se actualice
+    await p.waitForTimeout(1000);
 
     return {
       success: true,
@@ -673,7 +808,6 @@ const toolHandlers = {
       title: await p.title()
     };
   },
-
   // INTERACCIÓN CON ELEMENTOS
   async click({ selector, timeout = 5000 }) {
     const p = await initBrowser();
@@ -688,12 +822,12 @@ const toolHandlers = {
 
     // Usar selectores mapeados si están disponibles y el selector no es específico
     let effectiveSelector = selector;
-    
+
     // Si el selector es genérico, intentar enriquecerlo con selectores mapeados
     if (SELECTORS && selector && !selector.includes('[') && !selector.includes(':has')) {
       // Intentar mapear texto simple a selector más robusto
       const selectorText = selector.toLowerCase();
-      
+
       if (selectorText.includes('iniciar sesión') || selectorText === 'login') {
         effectiveSelector = SELECTORS.HEADER_SELECTORS?.auth?.iniciarSesion || selector;
       } else if (selectorText.includes('registrarse') || selectorText === 'register') {
@@ -707,7 +841,7 @@ const toolHandlers = {
       } else if (selectorText.includes('continuar')) {
         effectiveSelector = SELECTORS.CART_SELECTORS?.continuar || selector;
       }
-      
+
       console.error(`[click] Selector enriquecido: ${selector} → ${effectiveSelector}`);
     }
 
@@ -719,21 +853,21 @@ const toolHandlers = {
       `text="${searchText}"`,               // Texto exacto con comillas
       `text=${searchText}`,                 // Texto exacto sin comillas
       `text=/.*${searchText}.*/i`,          // Texto parcial (case-insensitive)
-      `[role="button"]:has-text("${searchText}")`, // Role button con texto
-      `button:has-text("${searchText}")`,   // Button con texto
-      `a:has-text("${searchText}")`,        // Link con texto
-      `[data-testid*="${searchText.toLowerCase().replace(/\s+/g, '-')}"]`, // data-testid
+      `[role = "button"]: has - text("${searchText}")`, // Role button con texto
+      `button: has - text("${searchText}")`,   // Button con texto
+      `a: has - text("${searchText}")`,        // Link con texto
+      `[data - testid*="${searchText.toLowerCase().replace(/\s+/g, '-')}"]`, // data-testid
     ];
 
     let lastError;
     for (const strategy of strategies) {
       try {
         await p.click(strategy, { timeout: 2000 }); // Timeout más corto por estrategia
-        console.error(`[click] ✅ Click exitoso con estrategia: ${strategy}`);
+        console.error(`[click] ✅ Click exitoso con estrategia: ${strategy} `);
         return { success: true, clicked: strategy };
       } catch (error) {
         lastError = error;
-        console.error(`[click] ❌ Estrategia falló: ${strategy}`);
+        console.error(`[click] ❌ Estrategia falló: ${strategy} `);
         continue;
       }
     }
@@ -786,7 +920,7 @@ const toolHandlers = {
         const imgEl = card.querySelector('img');
 
         return {
-          id: card.dataset.productId || card.dataset.id || `product-${idx}`,
+          id: card.dataset.productId || card.dataset.id || `product - ${idx} `,
           name: nameEl ? nameEl.textContent.trim() : 'Producto sin nombre',
           price: priceEl ? parseFloat(priceEl.textContent.replace(/[^\d.]/g, '')) : 0,
           image: imgEl ? imgEl.src : null,
@@ -802,6 +936,37 @@ const toolHandlers = {
     };
   },
 
+  // NUEVAS HERRAMIENTAS
+  async openModal({ type }) {
+    const p = await initBrowser();
+
+    // Ejecutar lógica en el cliente para abrir el modal
+    // El frontend debe exponer una función global o escuchar un evento
+    await p.evaluate((modalType) => {
+      // Disparar evento personalizado que el frontend escuche
+      const event = new CustomEvent('voice:open-modal', { detail: { type: modalType } });
+      window.dispatchEvent(event);
+    }, type);
+
+    return {
+      success: true,
+      message: `Abriendo modal: ${type} `
+    };
+  },
+
+  async openExternalLink({ target }) {
+    const p = await initBrowser();
+
+    await p.evaluate((linkTarget) => {
+      const event = new CustomEvent('voice:open-link', { detail: { target: linkTarget } });
+      window.dispatchEvent(event);
+    }, target);
+
+    return {
+      success: true,
+      message: `Abriendo enlace externo: ${target} `
+    };
+  },
   async search({ query }) {
     const p = await initBrowser();
 
@@ -809,7 +974,7 @@ const toolHandlers = {
     const searchSelector = SELECTORS?.CATALOG_SELECTORS?.search?.input ||
       '#search-products, input[name="search"], input[data-testid="search-input"], input[aria-label="Buscar productos"]';
 
-    console.error(`[search] Usando selector: ${searchSelector}`);
+    console.error(`[search] Usando selector: ${searchSelector} `);
 
     try {
       // Intentar llenar el campo de búsqueda
@@ -822,16 +987,20 @@ const toolHandlers = {
       const productSelector = SELECTORS?.CATALOG_SELECTORS?.productos?.card || '.MuiCard-root';
       const productsVisible = await p.$$(productSelector);
 
-      console.error(`[search] ✓ Búsqueda exitosa. Productos encontrados: ${productsVisible.length}`);
+      // Obtener datos detallados de los productos encontrados
+      const productsData = await toolHandlers.getProductsData({ limit: 5 });
+
+      console.error(`[search] ✓ Búsqueda exitosa.Productos encontrados: ${productsVisible.length} `);
 
       return {
         success: true,
         query,
         resultsLoaded: true,
-        productsFound: productsVisible.length
+        productsFound: productsVisible.length,
+        products: productsData.products // Incluir datos de productos
       };
     } catch (error) {
-      console.error(`[search] ✗ Error en búsqueda:`, error.message);
+      console.error(`[search] ✗ Error en búsqueda: `, error.message);
 
       // Fallback: listar inputs disponibles para debugging
       try {
@@ -847,10 +1016,10 @@ const toolHandlers = {
           }));
           inputsInfo.push(JSON.stringify(attrs));
         }
-        console.error(`[search] Inputs disponibles: ${inputsInfo.join(', ')}`);
-      } catch (e) {}
+        console.error(`[search] Inputs disponibles: ${inputsInfo.join(', ')} `);
+      } catch (e) { }
 
-      throw new Error(`No se pudo realizar la búsqueda: ${error.message}`);
+      throw new Error(`No se pudo realizar la búsqueda: ${error.message} `);
     }
   },
 
@@ -860,39 +1029,43 @@ const toolHandlers = {
     // Generar selector usando helper o fallback
     const categorySelector = SELECTORS?.CATALOG_SELECTORS?.filtros?.categoriaButton
       ? SELECTORS.CATALOG_SELECTORS.filtros.categoriaButton(category)
-      : `button:has-text("${category}")`;
+      : `button: has - text("${category}")`;
 
-    console.error(`[filterByCategory] Filtrando por: ${category}`);
-    console.error(`[filterByCategory] Selector: ${categorySelector}`);
+    console.error(`[filterByCategory] Filtrando por: ${category} `);
+    console.error(`[filterByCategory] Selector: ${categorySelector} `);
 
     // Intentar hacer clic en el botón de categoría
     const fallbackSelectors = [
       categorySelector,
-      `[data-category="${category}"]`,
-      `a:has-text("${category}")`,
-      `.category-${category.toLowerCase()}`
+      `[data - category= "${category}"]`,
+      `a: has - text("${category}")`,
+      `.category - ${category.toLowerCase()} `
     ];
 
     for (const selector of fallbackSelectors) {
       try {
         await p.click(selector, { timeout: 2000 });
         await p.waitForTimeout(500);
-        
-        console.error(`[filterByCategory] ✓ Filtro aplicado con selector: ${selector}`);
-        
+
+        // Obtener datos detallados de los productos filtrados
+        const productsData = await toolHandlers.getProductsData({ limit: 5 });
+
+        console.error(`[filterByCategory] ✓ Filtro aplicado con selector: ${selector} `);
+
         return {
           success: true,
           category,
           filtered: true,
-          selector
+          selector,
+          products: productsData.products // Incluir datos de productos
         };
       } catch (e) {
         continue;
       }
     }
 
-    console.error(`[filterByCategory] ✗ No se encontró la categoría: ${category}`);
-    throw new Error(`No se encontró la categoría: ${category}`);
+    console.error(`[filterByCategory] ✗ No se encontró la categoría: ${category} `);
+    throw new Error(`No se encontró la categoría: ${category} `);
   },
 
   async filterByPrice({ minPrice, maxPrice }) {
@@ -902,7 +1075,7 @@ const toolHandlers = {
     const min = minPrice !== undefined ? minPrice : 0;
     const max = maxPrice !== undefined ? maxPrice : 100;
 
-    console.error(`[MCP Playwright] Filtrando precios: ${min} - ${max}`);
+    console.error(`[MCP Playwright] Filtrando precios: ${min} - ${max} `);
 
     // El slider de MUI es complejo, mejor usar evaluate para cambiar el state directamente
     try {
@@ -945,7 +1118,7 @@ const toolHandlers = {
           }
         });
 
-        console.log(`[Price Filter] Valores establecidos: ${minVal} - ${maxVal}`);
+        console.log(`[Price Filter] Valores establecidos: ${minVal} - ${maxVal} `);
       }, [min, max]);
 
       // Esperar a que se aplique el filtro
@@ -969,13 +1142,13 @@ const toolHandlers = {
     const p = await initBrowser();
 
     // Buscar selector de ordenamiento
-    const sortValue = `${field}-${order}`;
+    const sortValue = `${field} -${order} `;
 
     try {
       await p.selectOption('select[name="sortBy"], select[name="ordenar"]', sortValue);
     } catch (e) {
       // Intentar con botones
-      await p.click(`button[data-sort="${sortValue}"]`);
+      await p.click(`button[data - sort= "${sortValue}"]`);
     }
 
     await p.waitForTimeout(500);
@@ -996,40 +1169,40 @@ const toolHandlers = {
 
     const productsData = await p.evaluate((lim) => {
       console.log('[DOM] Buscando productos en el DOM...');
-      
+
       // Buscar divs con estructura de ProductCard (Tailwind CSS)
       // Estructura: div > div.grid.grid-cols-[100px_1fr_auto]
       const productCards = Array.from(document.querySelectorAll('div[class*="bg-white"][class*="rounded-lg"][class*="shadow"], div[class*="border-red-300"]')).slice(0, lim);
-      
-      console.log(`[DOM] Encontradas ${productCards.length} tarjetas de productos (estructura ProductCard)`);
-      
+
+      console.log(`[DOM] Encontradas ${productCards.length} tarjetas de productos(estructura ProductCard)`);
+
       if (productCards.length === 0) {
         // Fallback: buscar cualquier div que contenga botón, imagen y título
         const allDivs = Array.from(document.querySelectorAll('div'));
-        const fallbackCards = allDivs.filter(div => 
+        const fallbackCards = allDivs.filter(div =>
           div.querySelector('button') && div.querySelector('img') && div.querySelector('h3')
         ).slice(0, lim);
         console.log(`[DOM] Fallback: encontradas ${fallbackCards.length} tarjetas con botón + imagen + título`);
-        
+
         if (fallbackCards.length === 0) {
           // Último fallback: buscar por botones que contengan texto "Añadir" o tengan clases relacionadas con carrito
-          const buttons = Array.from(document.querySelectorAll('button')).filter(btn => 
-            btn.textContent.includes('Añadir') || btn.textContent.includes('carrito') || 
+          const buttons = Array.from(document.querySelectorAll('button')).filter(btn =>
+            btn.textContent.includes('Añadir') || btn.textContent.includes('carrito') ||
             btn.className.includes('carrito') || btn.className.includes('cart')
           );
           console.log(`[DOM] Último fallback: encontrados ${buttons.length} botones de carrito`);
-          
+
           return buttons.slice(0, lim).map((button, idx) => {
             const container = button.closest('div[class*="bg-white"], div[class*="border"], div[class*="shadow"]');
             if (!container) return null;
-            
+
             const nameEl = container.querySelector('h3, h4, [class*="font-bold"]');
             const priceEl = container.querySelector('div[class*="text-red"], div[class*="font-bold"]:not(h3):not(h4)');
             const descEl = container.querySelector('p, div[class*="text-gray"]');
             const imgEl = container.querySelector('img');
-            
+
             return {
-              id: `fallback-product-${idx}`,
+              id: `fallback - product - ${idx} `,
               nombre: nameEl?.textContent?.trim() || 'Producto',
               descripcion: descEl?.textContent?.trim() || '',
               precio: priceEl ? parseFloat(priceEl.textContent.replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
@@ -1039,16 +1212,16 @@ const toolHandlers = {
             };
           }).filter(Boolean);
         }
-        
+
         return fallbackCards.map((card, idx) => {
           const nameEl = card.querySelector('h3, h4, [class*="font-bold"]');
           const priceEl = card.querySelector('div[class*="text-red"], div[class*="font-bold"]:not(h3):not(h4)');
           const descEl = card.querySelector('p, div[class*="text-gray"]');
           const imgEl = card.querySelector('img');
           const buttonEl = card.querySelector('button');
-          
+
           return {
-            id: `fallback-product-${idx}`,
+            id: `fallback - product - ${idx} `,
             nombre: nameEl?.textContent?.trim() || 'Producto',
             descripcion: descEl?.textContent?.trim() || '',
             precio: priceEl ? parseFloat(priceEl.textContent.replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
@@ -1058,33 +1231,33 @@ const toolHandlers = {
           };
         });
       }
-      
+
       return productCards.map((card, idx) => {
         // Estructura ProductCard: div > div.grid > [imagen, info, precio+botón]
         const gridContainer = card.querySelector('div[class*="grid"][class*="grid-cols"]');
-        
+
         // Extraer nombre (h3 dentro del div de info)
         const nameEl = card.querySelector('h3, h4, [class*="font-bold"]:not([class*="text-red"])');
-        
+
         // Extraer precio (div con text-red y font-bold)
         const priceEl = card.querySelector('div[class*="text-red"][class*="font-bold"], div[class*="text-xl"][class*="font-bold"]');
-        
+
         // Extraer descripción (párrafo con text-gray)
         const descEl = card.querySelector('p[class*="text-gray"], div[class*="text-gray"]');
-        
+
         // Extraer imagen
         const imgEl = card.querySelector('img');
-        
+
         // Verificar botón "Añadir al carrito"
         const allButtons = Array.from(card.querySelectorAll('button'));
-        const buttonEl = allButtons.find(btn => 
+        const buttonEl = allButtons.find(btn =>
           btn.textContent.includes('Añadir') || btn.textContent.includes('carrito') ||
           btn.className.includes('carrito') || btn.className.includes('cart')
         );
 
         const nombre = nameEl?.textContent?.trim() || 'Producto sin nombre';
         let precio = 0;
-        
+
         // Extraer precio (formato S/X.XX)
         if (priceEl) {
           const precioTexto = priceEl.textContent || '';
@@ -1095,7 +1268,7 @@ const toolHandlers = {
         }
 
         const producto = {
-          id: `product-${idx}`,
+          id: `product - ${idx} `,
           nombre,
           descripcion: descEl?.textContent?.trim() || '',
           precio,
@@ -1104,13 +1277,13 @@ const toolHandlers = {
           disponible: !!buttonEl && !buttonEl.disabled
         };
 
-        console.log(`[DOM] Producto ${idx + 1}: ${nombre} - S/${precio}`);
+        console.log(`[DOM] Producto ${idx + 1}: ${nombre} - S / ${precio} `);
         return producto;
       });
     }, limit);
 
     console.error(`[getProductsData] ✓ Obtenidos ${productsData.length} productos del DOM`);
-    
+
     return {
       success: true,
       products: productsData,
@@ -1126,13 +1299,13 @@ const toolHandlers = {
 
     // Usar la función search existente
     await toolHandlers.search({ query: searchTerm });
-    
+
     // Esperar a que se apliquen los filtros
     await p.waitForTimeout(1000);
-    
+
     // Obtener los productos filtrados
     const result = await toolHandlers.getProductsData({ limit: 10 });
-    
+
     return {
       success: true,
       searchTerm,
@@ -1144,75 +1317,75 @@ const toolHandlers = {
   async addProductToCart({ productName, productId, quantity = 1 }) {
     const p = await initBrowser();
 
-    console.error(`[addProductToCart] Buscando producto: ${productName || productId}`);
+    console.error(`[addProductToCart] Buscando producto: ${productName || productId} `);
 
     try {
       // Buscar y hacer click directamente en el DOM para evitar problemas de navegación
       const result = await p.evaluate(([searchName, searchId]) => {
-        console.log(`[DOM] Buscando producto: ${searchName || searchId}`);
-        
+        console.log(`[DOM] Buscando producto: ${searchName || searchId} `);
+
         // Buscar todas las tarjetas de productos con estructura Tailwind
         const productCards = Array.from(document.querySelectorAll('div[class*="bg-white"][class*="rounded-lg"][class*="shadow"], div[class*="border-red-300"]'));
         console.log(`[DOM] Encontradas ${productCards.length} tarjetas de productos`);
-        
+
         if (productCards.length === 0) {
           return { success: false, error: 'No se encontraron productos en la página' };
         }
-        
+
         // Buscar el producto específico
         let targetCard = null;
         let targetProductName = '';
-        
+
         for (const card of productCards) {
           const nameEl = card.querySelector('h3, h4, [class*="font-bold"]:not([class*="text-red"])');
           const productName = nameEl?.textContent?.trim() || '';
-          
+
           if (searchName && productName.toLowerCase().includes(searchName.toLowerCase())) {
             targetCard = card;
             targetProductName = productName;
             break;
           }
         }
-        
+
         if (!targetCard) {
-          return { success: false, error: `No se encontró el producto: ${searchName || searchId}` };
+          return { success: false, error: `No se encontró el producto: ${searchName || searchId} ` };
         }
-        
-        console.log(`[DOM] Producto encontrado: ${targetProductName}`);
-        
+
+        console.log(`[DOM] Producto encontrado: ${targetProductName} `);
+
         // Buscar el botón de agregar dentro de esta tarjeta específica
         const allButtons = Array.from(targetCard.querySelectorAll('button'));
-        const addButton = allButtons.find(btn => 
+        const addButton = allButtons.find(btn =>
           btn.textContent.includes('Añadir') || btn.textContent.includes('Agregar') ||
           btn.className.includes('carrito') || btn.className.includes('cart') ||
           btn.className.includes('MuiButton')
         );
-        
+
         if (!addButton) {
-          return { success: false, error: `No se encontró el botón para agregar: ${targetProductName}` };
+          return { success: false, error: `No se encontró el botón para agregar: ${targetProductName} ` };
         }
-        
+
         // Hacer click directamente
         addButton.click();
-        console.log(`[DOM] ✓ Click realizado en botón de: ${targetProductName}`);
-        
+        console.log(`[DOM] ✓ Click realizado en botón de: ${targetProductName} `);
+
         return {
           success: true,
           productName: targetProductName,
           clicked: true
         };
-        
+
       }, [productName, productId]);
-      
+
       if (!result.success) {
         throw new Error(result.error);
       }
-      
-      console.error(`[addProductToCart] ✓ Producto agregado: ${result.productName}`);
-      
+
+      console.error(`[addProductToCart] ✓ Producto agregado: ${result.productName} `);
+
       // Esperar menos tiempo para evitar navegación automática
       await p.waitForTimeout(200);
-      
+
       return {
         success: true,
         productName: result.productName,
@@ -1220,7 +1393,7 @@ const toolHandlers = {
         added: true,
         stayOnPage: true // Indicar que debe quedarse en la página
       };
-      
+
     } catch (error) {
       console.error('[addProductToCart] ✗ Error:', error.message);
       throw error;
@@ -1255,8 +1428,8 @@ const toolHandlers = {
     // Hacer clic en "Agregar al carrito" usando selectores mapeados
     const addButtonSelector = SELECTORS?.CATALOG_SELECTORS?.productos?.agregar ||
       'button:has-text("Agregar al carrito"), button:has-text("Agregar"), button:has-text("Añadir al carrito")';
-    
-    console.error(`[addToCart] Usando selector: ${addButtonSelector}`);
+
+    console.error(`[addToCart] Usando selector: ${addButtonSelector} `);
 
     try {
       await p.click(addButtonSelector, { timeout: 3000 });
@@ -1279,14 +1452,14 @@ const toolHandlers = {
   async updateCartQuantity({ itemId, quantity, productName }) {
     const p = await initBrowser();
 
-    console.error(`[updateCartQuantity] Iniciando actualización: itemId=${itemId}, quantity=${quantity}, productName=${productName}`);
+    console.error(`[updateCartQuantity] Iniciando actualización: itemId = ${itemId}, quantity = ${quantity}, productName = ${productName} `);
 
     try {
       // Debug: Verificar qué elementos data-item-id existen
       const debugInfo = await p.evaluate(() => {
         const dataItemElements = Array.from(document.querySelectorAll('[data-item-id]'));
         console.log('[DOM] Elementos con data-item-id encontrados:', dataItemElements.length);
-        
+
         return {
           dataItemIds: dataItemElements.map(el => ({
             id: el.getAttribute('data-item-id'),
@@ -1299,16 +1472,16 @@ const toolHandlers = {
         };
       });
 
-      console.error(`[updateCartQuantity] Debug DOM:`, debugInfo);
+      console.error(`[updateCartQuantity] Debug DOM: `, debugInfo);
 
       // NUEVA ESTRATEGIA: Buscar por nombre de producto si itemId no funciona
       let realItemId = null;
-      
+
       // Primero intentar con el itemId proporcionado
       const targetExists = await p.evaluate((id) => {
-        const target = document.querySelector(`[data-item-id="${id}"]`);
+        const target = document.querySelector(`[data - item - id= "${id}"]`);
         if (!target) return { exists: false };
-        
+
         return {
           exists: true,
           hasButtons: target.querySelectorAll('button').length,
@@ -1318,68 +1491,68 @@ const toolHandlers = {
         };
       }, itemId);
 
-      console.error(`[updateCartQuantity] Target ${itemId} analysis:`, targetExists);
+      console.error(`[updateCartQuantity] Target ${itemId} analysis: `, targetExists);
 
       if (targetExists.exists) {
         realItemId = itemId;
-        console.error(`[updateCartQuantity] ✓ Usando itemId original: ${itemId}`);
+        console.error(`[updateCartQuantity] ✓ Usando itemId original: ${itemId} `);
       } else {
         // Si no existe, buscar por nombre de producto
         console.error(`[updateCartQuantity] itemId ${itemId} no existe, buscando por nombre...`);
-        
+
         // Obtener el nombre del producto desde los datos de getCartState o usar productName
         realItemId = await p.evaluate(({ debugInfo, targetProductName }) => {
           console.log('[DOM] Buscando producto por nombre:', targetProductName);
-          
+
           if (!targetProductName) {
             console.log('[DOM] ✗ No se proporcionó nombre de producto');
             return null;
           }
-          
+
           const searchTerms = targetProductName.toLowerCase().split(/\s+/);
           console.log('[DOM] Términos de búsqueda:', searchTerms);
-          
+
           // Buscar por contenido de texto
           for (const item of debugInfo.dataItemIds) {
             const text = item.text.toLowerCase();
             console.log(`[DOM] Comparando "${text.substring(0, 50)}..."`);
-            
+
             // Buscar si TODOS los términos están presentes en el texto
             const allTermsMatch = searchTerms.every(term => text.includes(term));
-            
+
             if (allTermsMatch) {
               console.log(`[DOM] ✓ Coincidencia encontrada: ${item.id} para "${text.substring(0, 50)}"`);
               return item.id;
             }
-            
+
             // Alternativa: buscar coincidencia parcial (al menos 60% de los términos)
             const matchingTerms = searchTerms.filter(term => text.includes(term)).length;
             const matchPercentage = matchingTerms / searchTerms.length;
-            
+
             if (matchPercentage >= 0.6 && matchingTerms >= 1) {
-              console.log(`[DOM] ✓ Coincidencia parcial (${Math.round(matchPercentage * 100)}%): ${item.id} para "${text.substring(0, 50)}"`);
+              console.log(`[DOM] ✓ Coincidencia parcial(${Math.round(matchPercentage * 100)} %): ${item.id} para "${text.substring(0, 50)}"`);
               return item.id;
             }
           }
-          
+
           console.log('[DOM] ✗ No se encontró coincidencia por nombre');
           return null;
         }, { debugInfo, targetProductName: productName });
 
         if (realItemId) {
-          console.error(`[updateCartQuantity] ✓ Encontrado por nombre: ${realItemId}`);
+          console.error(`[updateCartQuantity] ✓ Encontrado por nombre: ${realItemId} `);
         } else {
           throw new Error(`No se pudo encontrar el producto ni por ID "${itemId}" ni por nombre "${productName}"`);
         }
       }
 
       // Opción 1: Intentar con input directo (menos común en esta app)
-      const input = await p.$(`[data-item-id="${realItemId}"] input[type="number"]`);
+      const input = await p.$(`[data - item - id= "${realItemId}"]input[type = "number"]`);
 
       if (input) {
         await input.fill(quantity.toString());
         await p.waitForTimeout(500);
-        console.error(`[MCP Playwright] ✓ Cantidad actualizada via input: ${quantity}`);
+        console.error(`[MCP Playwright] ✓ Cantidad actualizada via input: ${quantity} `);
 
         return {
           success: true,
@@ -1392,21 +1565,21 @@ const toolHandlers = {
       // Opción 2: Usar botones + y - (patrón de esta app)
       // Obtener cantidad actual
       const currentQuantity = await p.evaluate((id) => {
-        const container = document.querySelector(`[data-item-id="${id}"]`);
+        const container = document.querySelector(`[data - item - id= "${id}"]`);
         if (!container) {
-          console.log(`[DOM] ✗ No se encontró contenedor con data-item-id="${id}"`);
+          console.log(`[DOM] ✗ No se encontró contenedor con data - item - id="${id}"`);
           return 1;
         }
-        
+
         // Buscar TODOS los Typography dentro del contenedor principal
         const typographies = Array.from(container.querySelectorAll('.MuiTypography-root'));
         console.log(`[DOM] Encontrados ${typographies.length} Typography elements en el contenedor`);
-        
+
         // El que tiene la cantidad es el que contiene SOLO un número (sin S/, sin decimales)
         // Este Typography está entre los botones - y +
         for (const typo of typographies) {
           const text = typo.textContent.trim();
-          
+
           // Verificar que sea SOLO dígitos (la cantidad), sin símbolos ni decimales
           if (/^\d+$/.test(text)) {
             const qty = parseInt(text);
@@ -1417,12 +1590,12 @@ const toolHandlers = {
             }
           }
         }
-        
+
         console.log('[DOM] ✗ No se encontró Typography con cantidad válida, retornando 1 por defecto');
         return 1;
       }, realItemId);
 
-      console.error(`[MCP Playwright] Cantidad actual: ${currentQuantity}, objetivo: ${quantity}`);
+      console.error(`[MCP Playwright] Cantidad actual: ${currentQuantity}, objetivo: ${quantity} `);
 
       const difference = quantity - currentQuantity;
 
@@ -1430,64 +1603,64 @@ const toolHandlers = {
         // Aumentar: hacer clic en botón "+"
         // El botón + tiene el ícono <Add /> y es el último botón del QuantitySelector
         const plusSelectors = [
-          `[data-item-id="${realItemId}"] button.MuiIconButton-root:has(svg[data-testid="AddIcon"])`,
-          `[data-item-id="${realItemId}"] .MuiIconButton-root:last-of-type`,
-          `[data-item-id="${realItemId}"] button:has([data-testid="AddIcon"])`
+          `[data - item - id= "${realItemId}"]button.MuiIconButton - root: has(svg[data - testid= "AddIcon"])`,
+          `[data - item - id= "${realItemId}"] .MuiIconButton - root: last - of - type`,
+          `[data - item - id="${realItemId}"]button: has([data - testid="AddIcon"])`
         ];
-        
+
         let clicked = false;
         for (const selector of plusSelectors) {
           try {
-            console.error(`[updateCartQuantity] Probando selector +: ${selector}`);
+            console.error(`[updateCartQuantity] Probando selector +: ${selector} `);
             for (let i = 0; i < difference; i++) {
               await p.click(selector, { timeout: 2000 });
               await p.waitForTimeout(300);
             }
-            console.error(`[MCP Playwright] ✓ Cantidad aumentada ${difference} veces con ${selector}`);
+            console.error(`[MCP Playwright] ✓ Cantidad aumentada ${difference} veces con ${selector} `);
             clicked = true;
             break;
           } catch (e) {
-            console.error(`[updateCartQuantity] Selector ${selector} falló: ${e.message}`);
+            console.error(`[updateCartQuantity] Selector ${selector} falló: ${e.message} `);
             continue;
           }
         }
-        
+
         if (!clicked) {
-          throw new Error(`No se pudo hacer click en botón + del item ${realItemId}`);
+          throw new Error(`No se pudo hacer click en botón + del item ${realItemId} `);
         }
-        
+
       } else if (difference < 0) {
         // Disminuir: hacer clic en botón "-"
         // El botón - tiene el ícono <Remove /> y es el primer botón del QuantitySelector
         const minusSelectors = [
-          `[data-item-id="${realItemId}"] button.MuiIconButton-root:has(svg[data-testid="RemoveIcon"])`,
-          `[data-item-id="${realItemId}"] .MuiIconButton-root:first-of-type`,
-          `[data-item-id="${realItemId}"] button:has([data-testid="RemoveIcon"])`
+          `[data - item - id= "${realItemId}"]button.MuiIconButton - root: has(svg[data - testid= "RemoveIcon"])`,
+          `[data - item - id= "${realItemId}"] .MuiIconButton - root: first - of - type`,
+          `[data - item - id="${realItemId}"]button: has([data - testid="RemoveIcon"])`
         ];
-        
+
         let clicked = false;
         for (const selector of minusSelectors) {
           try {
-            console.error(`[updateCartQuantity] Probando selector -: ${selector}`);
+            console.error(`[updateCartQuantity] Probando selector -: ${selector} `);
             for (let i = 0; i < Math.abs(difference); i++) {
               await p.click(selector, { timeout: 2000 });
               await p.waitForTimeout(300);
             }
-            console.error(`[MCP Playwright] ✓ Cantidad disminuida ${Math.abs(difference)} veces con ${selector}`);
+            console.error(`[MCP Playwright] ✓ Cantidad disminuida ${Math.abs(difference)} veces con ${selector} `);
             clicked = true;
             break;
           } catch (e) {
-            console.error(`[updateCartQuantity] Selector ${selector} falló: ${e.message}`);
+            console.error(`[updateCartQuantity] Selector ${selector} falló: ${e.message} `);
             continue;
           }
         }
-        
+
         if (!clicked) {
-          throw new Error(`No se pudo hacer click en botón - del item ${realItemId}`);
+          throw new Error(`No se pudo hacer click en botón - del item ${realItemId} `);
         }
-        
+
       } else {
-        console.error(`[MCP Playwright] ℹ Cantidad ya es ${quantity}`);
+        console.error(`[MCP Playwright] ℹ Cantidad ya es ${quantity} `);
       }
 
       return {
@@ -1507,7 +1680,7 @@ const toolHandlers = {
   async removeFromCart({ itemId, productName }) {
     const p = await initBrowser();
 
-    console.error(`[removeFromCart] Iniciando eliminación: itemId=${itemId}, productName=${productName}`);
+    console.error(`[removeFromCart] Iniciando eliminación: itemId = ${itemId}, productName = ${productName} `);
 
     try {
       // Debug: Verificar qué elementos data-item-id existen
@@ -1522,64 +1695,64 @@ const toolHandlers = {
         };
       });
 
-      console.error(`[removeFromCart] Debug DOM:`, debugInfo);
+      console.error(`[removeFromCart] Debug DOM: `, debugInfo);
 
       // Buscar ID real como en updateCartQuantity
       let realItemId = null;
-      
+
       // Primero intentar con el itemId proporcionado
       const targetExists = await p.evaluate((id) => {
-        const target = document.querySelector(`[data-item-id="${id}"]`);
+        const target = document.querySelector(`[data - item - id= "${id}"]`);
         return { exists: !!target };
       }, itemId);
 
       if (targetExists.exists) {
         realItemId = itemId;
-        console.error(`[removeFromCart] ✓ Usando itemId original: ${itemId}`);
+        console.error(`[removeFromCart] ✓ Usando itemId original: ${itemId} `);
       } else {
         // Buscar por nombre de producto usando la misma lógica flexible de updateCartQuantity
         console.error(`[removeFromCart] itemId ${itemId} no existe, buscando por nombre...`);
-        
+
         realItemId = await p.evaluate(({ debugInfo, targetProductName }) => {
           console.log('[DOM] Buscando producto por nombre para eliminar:', targetProductName);
-          
+
           if (!targetProductName) {
             console.log('[DOM] ✗ No se proporcionó nombre de producto');
             return null;
           }
-          
+
           const searchTerms = targetProductName.toLowerCase().split(/\s+/);
           console.log('[DOM] Términos de búsqueda:', searchTerms);
-          
+
           // Buscar por contenido de texto
           for (const item of debugInfo.dataItemIds) {
             const text = item.text.toLowerCase();
             console.log(`[DOM] Comparando "${text.substring(0, 50)}..."`);
-            
+
             // Buscar si TODOS los términos están presentes en el texto
             const allTermsMatch = searchTerms.every(term => text.includes(term));
-            
+
             if (allTermsMatch) {
               console.log(`[DOM] ✓ Coincidencia encontrada: ${item.id} para "${text.substring(0, 50)}"`);
               return item.id;
             }
-            
+
             // Alternativa: buscar coincidencia parcial (al menos 60% de los términos)
             const matchingTerms = searchTerms.filter(term => text.includes(term)).length;
             const matchPercentage = matchingTerms / searchTerms.length;
-            
+
             if (matchPercentage >= 0.6 && matchingTerms >= 1) {
-              console.log(`[DOM] ✓ Coincidencia parcial (${Math.round(matchPercentage * 100)}%): ${item.id} para "${text.substring(0, 50)}"`);
+              console.log(`[DOM] ✓ Coincidencia parcial(${Math.round(matchPercentage * 100)} %): ${item.id} para "${text.substring(0, 50)}"`);
               return item.id;
             }
           }
-          
+
           console.log('[DOM] ✗ No se encontró coincidencia por nombre para eliminar');
           return null;
         }, { debugInfo, targetProductName: productName });
 
         if (realItemId) {
-          console.error(`[removeFromCart] ✓ Encontrado por nombre: ${realItemId}`);
+          console.error(`[removeFromCart] ✓ Encontrado por nombre: ${realItemId} `);
         } else {
           throw new Error(`No se pudo encontrar el producto ni por ID "${itemId}" ni por nombre "${productName}"`);
         }
@@ -1587,30 +1760,30 @@ const toolHandlers = {
 
       // Buscar botón de eliminar (CloseIcon)
       const removeSelectors = [
-        `[data-item-id="${realItemId}"] svg[data-testid="CloseIcon"]`, // Directo al icono
-        `[data-item-id="${realItemId}"] button:has(svg[data-testid="CloseIcon"])`, // Botón que contiene el icono
-        `[data-item-id="${realItemId}"] [data-testid="CloseIcon"]`,
-        `[data-item-id="${realItemId}"] button[aria-label="delete"]`,
-        `[data-item-id="${realItemId}"] button[aria-label="remove"]`
+        `[data - item - id= "${realItemId}"]svg[data - testid= "CloseIcon"]`, // Directo al icono
+        `[data - item - id= "${realItemId}"]button: has(svg[data - testid= "CloseIcon"])`, // Botón que contiene el icono
+        `[data - item - id= "${realItemId}"][data - testid="CloseIcon"]`,
+        `[data - item - id= "${realItemId}"]button[aria - label= "delete"]`,
+        `[data - item - id= "${realItemId}"]button[aria - label= "remove"]`
       ];
 
       let clicked = false;
       for (const selector of removeSelectors) {
         try {
-          console.error(`[removeFromCart] Probando selector: ${selector}`);
+          console.error(`[removeFromCart] Probando selector: ${selector} `);
           await p.click(selector, { timeout: 2000 });
           await p.waitForTimeout(500);
-          console.error(`[removeFromCart] ✓ Item eliminado con selector: ${selector}`);
+          console.error(`[removeFromCart] ✓ Item eliminado con selector: ${selector} `);
           clicked = true;
           break;
         } catch (e) {
-          console.error(`[removeFromCart] Selector ${selector} falló: ${e.message}`);
+          console.error(`[removeFromCart] Selector ${selector} falló: ${e.message} `);
           continue;
         }
       }
 
       if (!clicked) {
-        throw new Error(`No se pudo hacer click en botón eliminar del item ${realItemId}`);
+        throw new Error(`No se pudo hacer click en botón eliminar del item ${realItemId} `);
       }
 
       return {
@@ -1628,36 +1801,36 @@ const toolHandlers = {
   async selectPaymentMethod({ method }) {
     const p = await initBrowser();
 
-    console.error(`[selectPaymentMethod] Seleccionando método: ${method}`);
+    console.error(`[selectPaymentMethod] Seleccionando método: ${method} `);
 
     try {
       // Mapear método a valor del radio button
       const methodValue = method.toLowerCase() === 'yape' ? 'yape' : 'plin';
-      
+
       // Selectores para los radio buttons
       const selectors = [
-        `input[value="${methodValue}"]`, // Directo al input radio
-        `label:has(input[value="${methodValue}"])`, // Label que contiene el input
-        `[role="radio"][value="${methodValue}"]` // Aria role
+        `input[value = "${methodValue}"]`, // Directo al input radio
+        `label: has(input[value = "${methodValue}"])`, // Label que contiene el input
+        `[role = "radio"][value = "${methodValue}"]` // Aria role
       ];
 
       let clicked = false;
       for (const selector of selectors) {
         try {
-          console.error(`[selectPaymentMethod] Probando selector: ${selector}`);
+          console.error(`[selectPaymentMethod] Probando selector: ${selector} `);
           await p.click(selector, { timeout: 2000 });
           await p.waitForTimeout(300);
-          console.error(`[selectPaymentMethod] ✓ Método seleccionado: ${methodValue}`);
+          console.error(`[selectPaymentMethod] ✓ Método seleccionado: ${methodValue} `);
           clicked = true;
           break;
         } catch (e) {
-          console.error(`[selectPaymentMethod] Selector ${selector} falló: ${e.message}`);
+          console.error(`[selectPaymentMethod] Selector ${selector} falló: ${e.message} `);
           continue;
         }
       }
 
       if (!clicked) {
-        throw new Error(`No se pudo seleccionar el método de pago: ${method}`);
+        throw new Error(`No se pudo seleccionar el método de pago: ${method} `);
       }
 
       return {
@@ -1675,7 +1848,7 @@ const toolHandlers = {
   async fillPhoneNumber({ phoneNumber }) {
     const p = await initBrowser();
 
-    console.error(`[fillPhoneNumber] Llenando teléfono: ${phoneNumber}`);
+    console.error(`[fillPhoneNumber] Llenando teléfono: ${phoneNumber} `);
 
     try {
       // Selectores específicos para el campo de teléfono
@@ -1691,21 +1864,21 @@ const toolHandlers = {
       let filled = false;
       for (const selector of selectors) {
         try {
-          console.error(`[fillPhoneNumber] Probando selector: ${selector}`);
-          
+          console.error(`[fillPhoneNumber] Probando selector: ${selector} `);
+
           // Limpiar campo primero
           await p.fill(selector, '', { timeout: 2000 });
           await p.waitForTimeout(100);
-          
+
           // Llenar con número
           await p.fill(selector, phoneNumber);
           await p.waitForTimeout(300);
-          
-          console.error(`[fillPhoneNumber] ✓ Teléfono llenado con selector: ${selector}`);
+
+          console.error(`[fillPhoneNumber] ✓ Teléfono llenado con selector: ${selector} `);
           filled = true;
           break;
         } catch (e) {
-          console.error(`[fillPhoneNumber] Selector ${selector} falló: ${e.message}`);
+          console.error(`[fillPhoneNumber] Selector ${selector} falló: ${e.message} `);
           continue;
         }
       }
@@ -1729,7 +1902,7 @@ const toolHandlers = {
   async fillVerificationCode({ verificationCode }) {
     const p = await initBrowser();
 
-    console.error(`[fillVerificationCode] Llenando código: ${verificationCode}`);
+    console.error(`[fillVerificationCode] Llenando código: ${verificationCode} `);
 
     try {
       // Selectores específicos para el campo de código de verificación
@@ -1745,21 +1918,21 @@ const toolHandlers = {
       let filled = false;
       for (const selector of selectors) {
         try {
-          console.error(`[fillVerificationCode] Probando selector: ${selector}`);
-          
+          console.error(`[fillVerificationCode] Probando selector: ${selector} `);
+
           // Limpiar campo primero
           await p.fill(selector, '', { timeout: 2000 });
           await p.waitForTimeout(100);
-          
+
           // Llenar con código
           await p.fill(selector, verificationCode);
           await p.waitForTimeout(300);
-          
-          console.error(`[fillVerificationCode] ✓ Código llenado con selector: ${selector}`);
+
+          console.error(`[fillVerificationCode] ✓ Código llenado con selector: ${selector} `);
           filled = true;
           break;
         } catch (e) {
-          console.error(`[fillVerificationCode] Selector ${selector} falló: ${e.message}`);
+          console.error(`[fillVerificationCode] Selector ${selector} falló: ${e.message} `);
           continue;
         }
       }
@@ -1798,14 +1971,14 @@ const toolHandlers = {
       let clicked = false;
       for (const selector of selectors) {
         try {
-          console.error(`[confirmPayment] Probando selector: ${selector}`);
+          console.error(`[confirmPayment] Probando selector: ${selector} `);
           await p.click(selector, { timeout: 2000 });
           await p.waitForTimeout(500);
-          console.error(`[confirmPayment] ✓ Pago confirmado con selector: ${selector}`);
+          console.error(`[confirmPayment] ✓ Pago confirmado con selector: ${selector} `);
           clicked = true;
           break;
         } catch (e) {
-          console.error(`[confirmPayment] Selector ${selector} falló: ${e.message}`);
+          console.error(`[confirmPayment] Selector ${selector} falló: ${e.message} `);
           continue;
         }
       }
@@ -1832,22 +2005,22 @@ const toolHandlers = {
 
     const cartData = await p.evaluate(() => {
       console.log('[DOM] Accediendo al Redux store del carrito...');
-      
+
       let cartItems = [];
       let cartTotal = 0;
       let purchaseId = 'C-001';
       let shipping = 'Recojo en tienda';
-      
+
       try {
         // Intentar acceder al Redux store desde window.__REDUX_STORE__ o similar
         let reduxState = null;
-        
+
         // Buscar el store de Redux de diferentes maneras
         console.log('[DOM] Buscando Redux store...');
         console.log('[DOM] window.__REDUX_STORE__:', !!window.__REDUX_STORE__);
         console.log('[DOM] window.store:', !!window.store);
         console.log('[DOM] window.__store:', !!window.__store);
-        
+
         if (window.__REDUX_STORE__) {
           console.log('[DOM] Usando window.__REDUX_STORE__');
           reduxState = window.__REDUX_STORE__.getState();
@@ -1875,31 +2048,31 @@ const toolHandlers = {
             }
           }
         }
-        
+
         if (reduxState && reduxState.cart) {
           console.log('[DOM] ✓ Estado Redux del carrito encontrado');
           const cart = reduxState.cart;
-          
-          console.log(`[DOM] Redux cart state:`, {
+
+          console.log(`[DOM] Redux cart state: `, {
             hasItems: !!(cart.items),
             itemsType: typeof cart.items,
             itemsLength: cart.items?.length,
             totalAmount: cart.totalAmount,
             orderId: cart.orderId
           });
-          
+
           if (cart.items && Array.isArray(cart.items) && cart.items.length > 0) {
             cartItems = cart.items.map((item, index) => {
-              console.log(`[DOM] Procesando item ${index}:`, {
+              console.log(`[DOM] Procesando item ${index}: `, {
                 id_detalle: item.id_detalle,
                 nombre: item.nombre,
                 precio: item.precio,
                 cantidad: item.cantidad,
                 subtotal: item.subtotal
               });
-              
+
               return {
-                id_detalle: item.id_detalle || `item-${index}`,
+                id_detalle: item.id_detalle || `item - ${index} `,
                 name: item.nombre || 'Producto sin nombre',
                 price: parseFloat(item.precio) || 0,
                 quantity: parseInt(item.cantidad) || 1,
@@ -1907,57 +2080,57 @@ const toolHandlers = {
                 total: parseFloat(item.subtotal) || (parseFloat(item.precio) * parseInt(item.cantidad))
               };
             });
-            
-            console.log(`[DOM] ✓ Items mapeados COMPLETO (${cartItems.length} items):`, 
-              JSON.stringify(cartItems.map((item, idx) => ({ 
-                index: idx, 
-                id: item.id_detalle, 
-                name: item.name 
+
+            console.log(`[DOM] ✓ Items mapeados COMPLETO(${cartItems.length} items): `,
+              JSON.stringify(cartItems.map((item, idx) => ({
+                index: idx,
+                id: item.id_detalle,
+                name: item.name
               })), null, 2)
             );
           } else {
             console.log('[DOM] ⚠️ No hay items en el carrito o items no es array válido');
           }
-          
+
           cartTotal = parseFloat(cart.totalAmount) || 0;
           purchaseId = cart.orderId || 'C-001';
-          
-          console.log(`[DOM] ✓ Totales: ${cartItems.length} productos, total: S/${cartTotal}`);
+
+          console.log(`[DOM] ✓ Totales: ${cartItems.length} productos, total: S / ${cartTotal} `);
         } else {
           console.log('[DOM] ⚠️ No se pudo acceder al Redux store, intentando DOM...');
-          
+
           // Fallback: intentar extraer del DOM como respaldo
-          const productRows = Array.from(document.querySelectorAll('[style*="grid-template-columns"]')).filter(row => 
+          const productRows = Array.from(document.querySelectorAll('[style*="grid-template-columns"]')).filter(row =>
             row.style.gridTemplateColumns && row.style.gridTemplateColumns.includes('minmax')
           );
-          
+
           console.log(`[DOM] Encontradas ${productRows.length} filas de productos en DOM`);
-          
+
           for (const row of productRows) {
             try {
               // Buscar nombre del producto
               const nameEl = row.querySelector('img + *') || row.querySelector('[alt] ~ *');
               const name = nameEl?.textContent?.trim();
-              
+
               if (!name || name.length < 3) continue;
-              
+
               // Buscar precios (S/)
-              const priceElements = Array.from(row.querySelectorAll('*')).filter(el => 
+              const priceElements = Array.from(row.querySelectorAll('*')).filter(el =>
                 el.textContent && el.textContent.includes('S/') && !el.querySelector('*')
               );
-              
+
               let price = 0;
               let quantity = 1;
               let totalParcial = 0;
-              
+
               if (priceElements.length >= 2) {
                 const priceMatch = priceElements[0].textContent.match(/S\/(\d+\.?\d*)/);
                 const totalMatch = priceElements[1].textContent.match(/S\/(\d+\.?\d*)/);
-                
+
                 if (priceMatch) price = parseFloat(priceMatch[1]);
                 if (totalMatch) totalParcial = parseFloat(totalMatch[1]);
               }
-              
+
               // Buscar cantidad
               const quantityText = row.textContent.match(/\b(\d+)\b/g);
               if (quantityText) {
@@ -1969,10 +2142,10 @@ const toolHandlers = {
                   }
                 }
               }
-              
+
               const imgEl = row.querySelector('img');
               const image = imgEl?.src || null;
-              
+
               if (name && price > 0) {
                 cartItems.push({
                   name,
@@ -1983,39 +2156,39 @@ const toolHandlers = {
                 });
               }
             } catch (error) {
-              console.log(`[DOM] Error procesando fila: ${error.message}`);
+              console.log(`[DOM] Error procesando fila: ${error.message} `);
             }
           }
         }
       } catch (error) {
-        console.log(`[DOM] Error accediendo a datos del carrito: ${error.message}`);
+        console.log(`[DOM] Error accediendo a datos del carrito: ${error.message} `);
       }
-      
+
       // Buscar información del resumen de compra (actualizar variables existentes)
       // purchaseId, shipping y cartTotal ya fueron declaradas arriba
-      
+
       // Buscar ID-Compra
-      const idElement = Array.from(document.querySelectorAll('*')).find(el => 
+      const idElement = Array.from(document.querySelectorAll('*')).find(el =>
         el.textContent && el.textContent.includes('ID-Compra')
       );
       if (idElement && idElement.nextSibling) {
         purchaseId = idElement.nextSibling.textContent?.trim() || 'C-001';
       }
-      
+
       // Buscar tipo de envío
-      const shippingElement = Array.from(document.querySelectorAll('*')).find(el => 
+      const shippingElement = Array.from(document.querySelectorAll('*')).find(el =>
         el.textContent && el.textContent.includes('Envío')
       );
       if (shippingElement && shippingElement.nextSibling) {
         shipping = shippingElement.nextSibling.textContent?.trim() || 'Recojo en tienda';
       }
-      
+
       // Buscar total (en color rojo y con mayor peso)
-      const totalElements = Array.from(document.querySelectorAll('*')).filter(el => 
-        el.textContent && el.textContent.includes('S/') && 
+      const totalElements = Array.from(document.querySelectorAll('*')).filter(el =>
+        el.textContent && el.textContent.includes('S/') &&
         (el.style.color === 'rgb(240, 0, 0)' || el.style.fontWeight === '700')
       );
-      
+
       if (totalElements.length > 0) {
         const totalText = totalElements[0].textContent;
         const totalMatch = totalText.match(/S\/(\d+\.?\d*)/);
@@ -2023,18 +2196,18 @@ const toolHandlers = {
           cartTotal = parseFloat(totalMatch[1]);
         }
       }
-      
+
       // Si no encontramos el total, calcularlo desde los items
       if (cartTotal === 0) {
         cartTotal = cartItems.reduce((sum, item) => sum + item.total, 0);
       }
-      
+
       // Buscar botones de navegación
       const continueButtons = [];
-      
+
       // Buscar botón "Continuar"
-      const continueBtn = Array.from(document.querySelectorAll('*')).find(el => 
-        el.textContent?.trim() === 'Continuar' && 
+      const continueBtn = Array.from(document.querySelectorAll('*')).find(el =>
+        el.textContent?.trim() === 'Continuar' &&
         (el.getAttribute('role') === 'button' || el.style.cursor === 'pointer')
       );
       if (continueBtn) {
@@ -2045,9 +2218,9 @@ const toolHandlers = {
           action: 'continue'
         });
       }
-      
+
       // Buscar botón "Proceder al Pago"
-      const paymentBtn = Array.from(document.querySelectorAll('*')).find(el => 
+      const paymentBtn = Array.from(document.querySelectorAll('*')).find(el =>
         el.textContent?.includes('Proceder al Pago')
       );
       if (paymentBtn) {
@@ -2058,11 +2231,11 @@ const toolHandlers = {
           action: 'payment'
         });
       }
-      
+
       console.log(`[DOM] Encontrados ${cartItems.length} productos en el carrito`);
-      console.log(`[DOM] Total del carrito: S/${cartTotal}`);
+      console.log(`[DOM] Total del carrito: S / ${cartTotal} `);
       console.log(`[DOM] Encontrados ${continueButtons.length} botones para continuar`);
-      
+
       return {
         items: cartItems,
         itemCount: cartItems.length,
@@ -2079,8 +2252,8 @@ const toolHandlers = {
     });
 
     console.error(`[getCartState] ✓ Encontrados ${cartData.items.length} productos en el carrito`);
-    console.error(`[getCartState] ✓ Total: S/${cartData.total}`);
-    
+    console.error(`[getCartState] ✓ Total: S / ${cartData.total} `);
+
     return {
       success: true,
       items: cartData.items,
@@ -2141,7 +2314,7 @@ const toolHandlers = {
 
     const debugInfo = await p.evaluate(() => {
       console.log('[DOM Debug] Iniciando análisis completo...');
-      
+
       const analysis = {
         url: window.location.href,
         title: document.title,
@@ -2154,7 +2327,7 @@ const toolHandlers = {
         priceElements: [],
         productElements: []
       };
-      
+
       // Analizar Redux store
       console.log('[DOM Debug] Analizando Redux store...');
       if (window.__REDUX_STORE__) {
@@ -2180,12 +2353,12 @@ const toolHandlers = {
       } else {
         analysis.reduxStore = { available: false, reason: 'window.__REDUX_STORE__ not found' };
       }
-      
+
       // Buscar todos los elementos con grid-template-columns
-      const gridElements = Array.from(document.querySelectorAll('*')).filter(el => 
+      const gridElements = Array.from(document.querySelectorAll('*')).filter(el =>
         el.style.gridTemplateColumns || el.className.includes('grid')
       );
-      
+
       analysis.gridElements = gridElements.map(el => ({
         tag: el.tagName,
         className: el.className,
@@ -2193,7 +2366,7 @@ const toolHandlers = {
         textContent: el.textContent?.substring(0, 100),
         children: el.children.length
       }));
-      
+
       // Buscar todos los textos que contengan S/
       const allElements = document.querySelectorAll('*');
       for (const el of allElements) {
@@ -2207,7 +2380,7 @@ const toolHandlers = {
           });
         }
       }
-      
+
       // Buscar imágenes
       const images = document.querySelectorAll('img');
       analysis.imageSources = Array.from(images).map(img => ({
@@ -2216,15 +2389,15 @@ const toolHandlers = {
         parentTag: img.parentElement?.tagName,
         parentClass: img.parentElement?.className
       }));
-      
+
       // Buscar elementos que podrían ser productos
       const potentialProducts = Array.from(document.querySelectorAll('*')).filter(el => {
         const text = el.textContent?.toLowerCase() || '';
-        return text.includes('torta') || text.includes('baguette') || 
-               text.includes('empanada') || text.includes('pan') ||
-               text.includes('cantidad') || text.includes('precio');
+        return text.includes('torta') || text.includes('baguette') ||
+          text.includes('empanada') || text.includes('pan') ||
+          text.includes('cantidad') || text.includes('precio');
       });
-      
+
       analysis.productElements = potentialProducts.slice(0, 10).map(el => ({
         tag: el.tagName,
         className: el.className,
@@ -2233,12 +2406,12 @@ const toolHandlers = {
         parentTag: el.parentElement?.tagName,
         parentClass: el.parentElement?.className
       }));
-      
+
       console.log(`[DOM Debug] Encontrados ${analysis.gridElements.length} elementos grid`);
       console.log(`[DOM Debug] Encontrados ${analysis.priceElements.length} elementos con S/`);
       console.log(`[DOM Debug] Encontradas ${analysis.imageSources.length} imágenes`);
       console.log(`[DOM Debug] Encontrados ${analysis.productElements.length} posibles productos`);
-      
+
       return analysis;
     });
 
@@ -2247,7 +2420,7 @@ const toolHandlers = {
     console.error(`- Price elements: ${debugInfo.priceElements.length}`);
     console.error(`- Images: ${debugInfo.imageSources.length}`);
     console.error(`- Product elements: ${debugInfo.productElements.length}`);
-    
+
     return {
       success: true,
       analysis: debugInfo
@@ -2270,40 +2443,40 @@ const toolHandlers = {
       ];
 
       let result = null;
-      
+
       // Intentar cada selector hasta encontrar uno que funcione
       for (const selector of continueSelectors) {
         try {
           console.error(`[proceedToPayment] Probando selector: ${selector}`);
-          
+
           await p.click(selector, { timeout: 2000 });
-          
+
           result = {
             success: true,
             buttonText: selector.includes('Continuar') ? 'Continuar' : 'Proceder al Pago',
             selector: selector,
             clicked: true
           };
-          
+
           console.error(`[proceedToPayment] ✓ Click exitoso con: ${selector}`);
           break;
-          
+
         } catch (e) {
           console.error(`[proceedToPayment] ✗ Selector ${selector} falló: ${e.message}`);
           continue;
         }
       }
-      
+
       // Si ningún selector funcionó, intentar búsqueda en DOM como fallback
       if (!result) {
         console.error('[proceedToPayment] Todos los selectores fallaron, buscando en DOM...');
-        
+
         result = await p.evaluate(() => {
           console.log('[DOM] Buscando botones para continuar al pago...');
-          
+
           // Buscar por data-testid primero
           let button = document.querySelector('[data-testid="cart-continue-button"]');
-          
+
           if (!button) {
             // Buscar botones con texto relacionado al pago/continuar
             const buttons = Array.from(document.querySelectorAll('*')).filter(btn => {
@@ -2311,25 +2484,25 @@ const toolHandlers = {
               const isVisible = btn.offsetParent !== null; // Verificar que esté visible
               const isClickable = btn.getAttribute('role') === 'button' || btn.style.cursor === 'pointer' || btn.tagName === 'BUTTON';
               return isVisible && isClickable && (
-                text.includes('continuar') || text.includes('proceder') || 
+                text.includes('continuar') || text.includes('proceder') ||
                 text.includes('pagar') || text.includes('checkout') ||
                 text.includes('siguiente') || text.includes('finalizar')
               );
             });
-            
+
             console.log(`[DOM] Encontrados ${buttons.length} botones de continuar`);
             button = buttons[0];
           }
-          
+
           if (!button) {
             return { success: false, error: 'No se encontró botón para continuar' };
           }
-          
+
           // Hacer click en el botón encontrado
           button.click();
-          
+
           console.log(`[DOM] ✓ Click en botón: "${button.textContent?.trim()}"`);
-          
+
           return {
             success: true,
             buttonText: button.textContent?.trim(),
@@ -2337,23 +2510,23 @@ const toolHandlers = {
           };
         });
       }
-      
+
       if (!result.success) {
         throw new Error(result.error);
       }
-      
+
       console.error(`[proceedToPayment] ✓ Click exitoso en: "${result.buttonText}"`);
-      
+
       // Esperar a que navegue
       await p.waitForTimeout(1000);
-      
+
       return {
         success: true,
         buttonText: result.buttonText,
         currentUrl: p.url(),
         proceededToPayment: true
       };
-      
+
     } catch (error) {
       console.error('[proceedToPayment] ✗ Error:', error.message);
       throw error;
@@ -2390,7 +2563,7 @@ const toolHandlers = {
     if (SELECTORS?.PAYMENT_SELECTORS?.metodoPago) {
       paymentMethodSelector = SELECTORS.PAYMENT_SELECTORS.metodoPago[metodoPago];
     }
-    
+
     if (!paymentMethodSelector) {
       paymentMethodSelector = `input[value="${metodoPago}"]`;
     }
@@ -2785,8 +2958,137 @@ const toolHandlers = {
     }
   },
 
+  // GESTIÓN DE CREDENCIALES
+  async saveLoginCredentials({ alias, email, password, role }) {
+    const success = credentialManager.saveIdentity(alias, email, password, role);
+    return {
+      success,
+      message: success ? `Credenciales guardadas para ${alias}` : 'Error al guardar credenciales'
+    };
+  },
+
+  async getSavedIdentities() {
+    const identities = credentialManager.getAllIdentities();
+    return {
+      identities: identities.map(id => ({ alias: id.alias, email: id.email, role: id.role }))
+    };
+  },
+
+  async autoLogin({ alias }) {
+    const identity = credentialManager.getIdentityByAlias(alias);
+
+    if (!identity) {
+      throw new Error(`No se encontraron credenciales para el alias "${alias}"`);
+    }
+
+    const p = await initBrowser();
+
+    // 1. Asegurar que estamos en la aplicación
+    if (!p.url().startsWith(APP_URL)) {
+      await p.goto(APP_URL, { waitUntil: 'networkidle' });
+    }
+
+    // 2. Abrir modal de login usando la herramienta navigate actualizada
+    console.log(`[autoLogin] Abriendo modal de login para ${alias}`);
+    // Usamos navigate que ahora maneja la apertura del modal
+    await toolHandlers.navigate({ url: '/login' });
+
+    // 3. Esperar a que el formulario sea visible
+    const emailSelector = SELECTORS?.HEADER_SELECTORS?.auth?.emailInput || 'input[type="email"]';
+    const passwordSelector = SELECTORS?.HEADER_SELECTORS?.auth?.passwordInput || 'input[type="password"]';
+    const submitSelector = SELECTORS?.HEADER_SELECTORS?.auth?.submitButton || 'button[type="submit"]';
+
+    try {
+      // Esperar un poco a que el modal abra y la animación termine
+      await p.waitForTimeout(1000);
+
+      console.log(`[autoLogin] Llenando credenciales para ${identity.email}`);
+      await p.fill(emailSelector, identity.email);
+      await p.fill(passwordSelector, identity.password);
+      await p.click(submitSelector);
+
+      // Esperar a que se procese el login
+      await p.waitForTimeout(2000);
+
+      return {
+        success: true,
+        message: `Sesión iniciada como ${identity.alias} (${identity.email})`,
+        currentUrl: p.url()
+      };
+    } catch (error) {
+      console.error('Error en autoLogin:', error);
+      throw new Error(`Falló el inicio de sesión automático: ${error.message}`);
+    }
+  },
+
   async debugCartDOM() {
     return await this.debugCartDOM();
+  },
+
+  // ADMIN TOOLS
+  async updateOrderStatus({ orderId, status }) {
+    // Implementación directa via API o UI
+    // Por ahora simularemos UI interaction si es posible, o API call
+    // Dado que no tenemos API client en node, usaremos fetch desde el navegador context
+    const p = await initBrowser();
+
+    console.log(`[updateOrderStatus] Actualizando pedido ${orderId} a ${status}`);
+
+    const result = await p.evaluate(async ({ orderId, status }) => {
+      try {
+        // Intentar usar la API interna si está expuesta, o fetch
+        // Asumimos que hay un endpoint /api/pedidos
+        const response = await fetch(`/api/pedidos/${orderId}/estado`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            // Asumimos que la cookie de sesión se envía automáticamente
+          },
+          body: JSON.stringify({ estado: status })
+        });
+
+        if (!response.ok) throw new Error('Error en API');
+        return { success: true };
+      } catch (e) {
+        return { success: false, error: e.message };
+      }
+    }, { orderId, status });
+
+    if (result.success) {
+      return { success: true, message: `Pedido ${orderId} actualizado a ${status}` };
+    } else {
+      // Fallback: Intentar UI
+      // Navegar a pedidos admin
+      await toolHandlers.navigate({ url: '/pedidos-admin' });
+      // Buscar pedido y clickear botón (esto es complejo sin selectores precisos de ID)
+      // Por ahora retornamos error si API falla
+      throw new Error(`No se pudo actualizar el pedido: ${result.error}`);
+    }
+  },
+
+  async updateProduct({ productId, updates }) {
+    const p = await initBrowser();
+    console.log(`[updateProduct] Actualizando producto ${productId}`, updates);
+
+    const result = await p.evaluate(async ({ productId, updates }) => {
+      try {
+        const response = await fetch(`/api/productos/${productId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates)
+        });
+        if (!response.ok) throw new Error('Error en API');
+        return { success: true };
+      } catch (e) {
+        return { success: false, error: e.message };
+      }
+    }, { productId, updates });
+
+    if (result.success) {
+      return { success: true, message: `Producto actualizado correctamente` };
+    } else {
+      throw new Error(`Error actualizando producto: ${result.error}`);
+    }
   }
 };
 

@@ -18,9 +18,23 @@ let isInitializing = false;
  * Inicializa el cliente MCP conectándose al servidor Playwright
  * El servidor MCP debe estar corriendo en mcp-server/
  */
+/**
+ * Inicializa el cliente MCP conectándose al servidor Playwright
+ * El servidor MCP debe estar corriendo en mcp-server/
+ */
 async function initMCPClient() {
   if (mcpClient) {
-    return mcpClient;
+    // Keep-Alive Check: Verificar si la conexión sigue activa
+    try {
+      // Intentar una operación ligera (listar herramientas) con timeout corto
+      const pingPromise = mcpClient.listTools();
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Ping timeout')), 1000));
+      await Promise.race([pingPromise, timeoutPromise]);
+      return mcpClient;
+    } catch (error) {
+      console.warn('[MCP Orchestrator] ⚠️ Conexión perdida, reconectando...', error.message);
+      mcpClient = null; // Forzar reconexión
+    }
   }
 
   if (isInitializing) {
@@ -109,7 +123,6 @@ export async function executeMCPPlan(steps, context = {}) {
   let stepsFailed = 0;
 
   console.log(`[MCP Orchestrator] Ejecutando plan con ${steps.length} steps`);
-
   /**
    * Ejecuta un step con retry logic y exponential backoff
    * @param {Function} fn - Función async que ejecuta el step
@@ -120,38 +133,29 @@ export async function executeMCPPlan(steps, context = {}) {
   async function executeStepWithRetry(fn, maxRetries = 3, baseDelay = 500) {
     let lastError;
     let totalAttempts = 0;
-    
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      totalAttempts = attempt + 1; // Contar desde 1
       try {
+        totalAttempts++;
         const result = await fn();
-        
-        if (attempt > 0) {
-          console.log(`[MCP Orchestrator] ✓ Reintento ${attempt + 1} exitoso`);
-        }
-        
         return { result, attempts: totalAttempts };
       } catch (error) {
         lastError = error;
-        
-        // Si no hay más reintentos, adjuntar el número de intentos al error
         if (attempt === maxRetries - 1) {
-          console.error(`[MCP Orchestrator] ✗ Todos los reintentos fallaron: ${error.message}`);
-          // Adjuntar información de intentos al error
           error.attempts = totalAttempts;
           throw error;
         }
-        
+
         // Calcular delay con exponential backoff: baseDelay * 2^attempt
         const delay = baseDelay * Math.pow(2, attempt);
         console.warn(`[MCP Orchestrator] ⚠ Intento ${attempt + 1} falló: ${error.message}`);
         console.warn(`[MCP Orchestrator] ⏳ Reintentando en ${delay}ms...`);
-        
+
         // Esperar antes del siguiente intento
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-    
+
     // Esto no debería alcanzarse, pero por seguridad
     lastError.attempts = totalAttempts;
     throw lastError;
@@ -167,14 +171,14 @@ export async function executeMCPPlan(steps, context = {}) {
     try {
       // Llamar a la herramienta MCP con retry logic
       const startTime = Date.now();
-      
+
       const { result, attempts } = await executeStepWithRetry(async () => {
         return await client.callTool({
           name: step.tool,
           arguments: step.params || {}
         });
       });
-      
+
       const duration = Date.now() - startTime;
 
       // Parsear resultado

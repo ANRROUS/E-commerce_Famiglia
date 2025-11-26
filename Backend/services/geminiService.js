@@ -139,7 +139,7 @@ Responde ÚNICAMENTE con un JSON válido en este formato exacto (sin markdown, s
       descripcion: recommendedProduct.descripcion,
       precio: parseFloat(recommendedProduct.precio),
       url_imagen: recommendedProduct.url_imagen,
-      stock: recommendedProduct.stock,
+      stock: recommendedProduct.stock?.cantidad || 0,
       id_categoria: recommendedProduct.id_categoria.toString()
     };
 
