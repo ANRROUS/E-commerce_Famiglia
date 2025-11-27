@@ -85,7 +85,7 @@ export default function CatalogoAdmin() {
 
   return (
     <Box
-      className="w-full min-h-screen bg-[#FFF5F0] font-['Montserrat']"
+      className="w-full min-h-screen bg-white font-['Montserrat']"
       sx={{
         py: { xs: 4, md: 8 },
         px: { xs: 3, sm: 6, md: 10, lg: 16 },
@@ -95,22 +95,27 @@ export default function CatalogoAdmin() {
         className="max-w-7xl mx-auto"
         sx={{
           display: 'flex',
-          gap: { xs: 2, md: 8 },
+          gap: { xs: 2, md: 6 },
           flexDirection: { xs: 'column', md: 'row' },
         }}
       >
         {/* SIDEBAR */}
         <Box
+          data-aos="fade-right"
           sx={{
             width: 260,
             position: 'sticky',
             top: '1rem',
             height: 'fit-content',
             display: { xs: 'none', md: 'block' },
+            border: '1px solid #E5E5E5',
+            borderRadius: 2,
+            p: 3,
+            backgroundColor: '#fff',
           }}
         >
           <Box sx={{ mb: 4 }}>
-            <Typography sx={{ color: '#8b3e3e', fontWeight: 700 }}>Categorías</Typography>
+            <Typography sx={{ color: '#8b3e3e', fontWeight: 700, fontSize: '1.1rem' }}>Categorías</Typography>
           </Box>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 6 }}>
@@ -163,13 +168,15 @@ export default function CatalogoAdmin() {
 
         {/* MAIN */}
         <Box sx={{ flex: 1 }}>
+          {/* Título */}
           <Typography
             variant="h3"
+            data-aos="fade-down"
             sx={{
               textAlign: 'center',
               fontWeight: 700,
               color: '#8b3e3e',
-              fontSize: { xs: '1.75rem', md: '3rem' },
+              fontSize: { xs: '1.75rem', md: '2.5rem' },
               mb: 4,
             }}
           >
@@ -210,18 +217,18 @@ export default function CatalogoAdmin() {
           ) : (
             <div className="space-y-3">
               {filteredProducts.map((p) => (
-                <ProductCard
-                  key={p.id}
-                  product={{
-                    id_producto: p.id,
-                    nombre: p.name,
-                    descripcion: p.description,
-                    precio: p.price,
-                    url_imagen: p.image,
-                    totalVendido: p.totalVendido || 0,
-                  }} showAddButton={false}
-
-                />
+                <div key={p.id} data-aos="fade-up">
+                  <ProductCard
+                    product={{
+                      id_producto: p.id,
+                      nombre: p.name,
+                      descripcion: p.description,
+                      precio: p.price,
+                      url_imagen: p.image,
+                      totalVendido: p.totalVendido || 0,
+                    }} showAddButton={false}
+                  />
+                </div>
               ))}
             </div>
           )}

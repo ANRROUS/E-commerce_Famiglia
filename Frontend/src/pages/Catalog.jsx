@@ -419,9 +419,22 @@ export default function Catalog() {
 
         {/* MAIN */}
         <Box sx={{ flex: 1 }}>
-          {/* Buscador */}
-          <Box sx={{ maxWidth: 900, mx: "auto", mb: 3 }}>
-            <BuscadorProductos value={searchTerm} onChange={(v) => { setSearchTerm(v); setPage(1); }} placeholder="Buscar por nombre o descripción" />
+          {/* Header with search */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
+            <Typography
+              variant="h4"
+              data-aos="fade-down"
+              sx={{
+                fontWeight: 700,
+                color: '#8b3e3e',
+                fontSize: { xs: '1.75rem', md: '2rem' },
+              }}
+            >
+              Nuestro Catálogo
+            </Typography>
+            <Box sx={{ width: { xs: '100%', sm: 400 } }} data-aos="fade-left">
+              <BuscadorProductos value={searchTerm} onChange={(v) => { setSearchTerm(v); setPage(1); }} placeholder="Buscar por nombre o descripción" />
+            </Box>
           </Box>
 
           {/* Filters header only if there are selected categories */}
@@ -456,19 +469,20 @@ export default function Catalog() {
           ) : (
             <Box>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {currentPageProducts.map((p) => (
-                  <ProductCard
-                    key={p.id}
-                    product={{
-                      id_producto: p.id,
-                      nombre: p.nombre,
-                      descripcion: p.descripcion,
-                      precio: p.precio,
-                      url_imagen: p.url_imagen,
-                      totalVendido: p.totalVendido || 0,
-                    }}
-                    onAddToCart={handleAddToCart}
-                  />
+                {currentPageProducts.map((p, index) => (
+                  <div key={p.id} data-aos="fade-up" data-aos-delay={index * 50}>
+                    <ProductCard
+                      product={{
+                        id_producto: p.id,
+                        nombre: p.nombre,
+                        descripcion: p.descripcion,
+                        precio: p.precio,
+                        url_imagen: p.url_imagen,
+                        totalVendido: p.totalVendido || 0,
+                      }}
+                      onAddToCart={handleAddToCart}
+                    />
+                  </div>
                 ))}
               </Box>
 

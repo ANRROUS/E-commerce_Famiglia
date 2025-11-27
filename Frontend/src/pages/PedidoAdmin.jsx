@@ -69,10 +69,10 @@ export default function PedidosAdmin() {
         const query = searchTerm.trim().toLowerCase();
         const fechaStr = pedido.fecha
           ? new Date(pedido.fecha).toLocaleDateString('es-PE', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            }).toLowerCase()
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          }).toLowerCase()
           : '';
 
         if (query.startsWith('#')) {
@@ -101,14 +101,14 @@ export default function PedidosAdmin() {
         prev.map((pedido) =>
           pedido.id_pedido === id_pedido
             ? {
-                ...pedido,
-                estado: (data.estado || estado).toLowerCase(),
-                codigo: data.codigo || pedido.codigo,
-                fecha: data.fecha ?? pedido.fecha,
-                usuario: data.usuario ?? pedido.usuario,
-                detalle_pedido: data.detalle_pedido ?? pedido.detalle_pedido,
-                pago: data.pago ?? pedido.pago,
-              }
+              ...pedido,
+              estado: (data.estado || estado).toLowerCase(),
+              codigo: data.codigo || pedido.codigo,
+              fecha: data.fecha ?? pedido.fecha,
+              usuario: data.usuario ?? pedido.usuario,
+              detalle_pedido: data.detalle_pedido ?? pedido.detalle_pedido,
+              pago: data.pago ?? pedido.pago,
+            }
             : pedido
         )
       );
@@ -145,24 +145,24 @@ export default function PedidosAdmin() {
 
   return (
     <Box
-      className="w-full min-h-screen bg-[#FFF5F0] font-['Montserrat']"
+      className="w-full min-h-screen bg-white font-['Montserrat']"
       sx={{ py: { xs: 4, md: 8 }, px: { xs: 3, sm: 6, md: 10, lg: 16 } }}
     >
       <Box
         className="max-w-7xl mx-auto"
-        sx={{ display: 'flex', gap: { xs: 3, md: 8 }, flexDirection: { xs: 'column', md: 'row' } }}
+        sx={{ display: 'flex', gap: { xs: 3, md: 6 }, flexDirection: { xs: 'column', md: 'row' } }}
       >
         <Box
+          data-aos="fade-right"
           sx={{
             width: 260,
             position: 'sticky',
             top: '1rem',
             height: 'fit-content',
-            backgroundColor: 'rgba(255,255,255,0.8)',
-            borderRadius: 3,
+            backgroundColor: '#fff',
+            borderRadius: 2,
             p: 3,
-            boxShadow: { md: '0 10px 25px rgba(0,0,0,0.05)' },
-            backdropFilter: 'blur(4px)',
+            border: '1px solid #E5E5E5',
           }}
         >
           <Typography sx={{ color: '#8b3e3e', fontWeight: 700, mb: 2 }}>
@@ -197,11 +197,12 @@ export default function PedidosAdmin() {
         <Box sx={{ flex: 1 }}>
           <Typography
             variant="h3"
+            data-aos="fade-down"
             sx={{
               textAlign: 'center',
               fontWeight: 700,
               color: '#8b3e3e',
-              fontSize: { xs: '1.75rem', md: '3rem' },
+              fontSize: { xs: '1.75rem', md: '2.5rem' },
               mb: 4,
             }}
           >
@@ -223,13 +224,14 @@ export default function PedidosAdmin() {
           ) : (
             <div className="space-y-3">
               {filteredPedidos.map((pedido) => (
-                <PedidoCard
-                  key={pedido.id_pedido}
-                  pedido={pedido}
-                  actions={buildActions(pedido)}
-                  onAction={(estado) => handleEstadoChange(pedido.id_pedido, estado)}
-                  isUpdating={updating === pedido.id_pedido}
-                />
+                <div key={pedido.id_pedido} data-aos="fade-up">
+                  <PedidoCard
+                    pedido={pedido}
+                    actions={buildActions(pedido)}
+                    onAction={(estado) => handleEstadoChange(pedido.id_pedido, estado)}
+                    isUpdating={updating === pedido.id_pedido}
+                  />
+                </div>
               ))}
             </div>
           )}

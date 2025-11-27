@@ -4,6 +4,8 @@ import { useDispatch, useSelector } from "react-redux";
 import { LoginModalProvider } from "./context/LoginModalContext";
 import { useLoginModal } from "./context/LoginModalContext";
 import LoginForm from "./components/forms/LoginForm";
+import AOS from 'aos';
+import 'aos/dist/aos.css';
 import Home from "./pages/Home";
 import Footer from "./components/layout/Footer";
 import Header from "./components/layout/Header";
@@ -52,6 +54,16 @@ function Layout() {
 
   // Ocultar header en home
   const hideHeader = location.pathname === "/" || location.pathname === "/home";
+
+  // Initialize AOS
+  useEffect(() => {
+    AOS.init({
+      duration: 800,
+      easing: 'ease-in-out',
+      once: true,
+      mirror: false,
+    });
+  }, []);
 
   // Verificar autenticación al cargar la app
   useEffect(() => {

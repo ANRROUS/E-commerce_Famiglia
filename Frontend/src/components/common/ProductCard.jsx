@@ -19,8 +19,8 @@ const ProductCard = ({ product, onAddToCart, showAddButton = true }) => {
     totalVendido = 0
   } = product;
 
-  const image = imageError 
-    ? '/images/placeholder-product.jpg' 
+  const image = imageError
+    ? '/images/placeholder-product.jpg'
     : (url_imagen || imagen || '/images/placeholder-product.jpg');
 
   const handleImageError = () => !imageError && setImageError(true);
@@ -49,12 +49,6 @@ const ProductCard = ({ product, onAddToCart, showAddButton = true }) => {
         <div className="flex flex-col justify-center">
           <h3 className="text-base font-bold text-black mb-1">{name}</h3>
           <p className="text-gray-700 text-sm mb-2 line-clamp-2">{description}</p>
-
-          {isBestSeller && (
-            <div className="inline-block bg-purple-200 text-purple-800 px-3 py-1 rounded text-xs font-medium w-fit">
-              Más comprado
-            </div>
-          )}
         </div>
 
         {/* Precio y botón (solo si showAddButton=true) */}

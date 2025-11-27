@@ -56,12 +56,12 @@ model producto {
   descripcion    String?
   precio         Float?           @db.Real
   url_imagen     String?
-  stock          Int?
   id_categoria   BigInt?
   id_tienda      BigInt?
   detalle_pedido detalle_pedido[]
   categoria      categoria?       @relation(fields: [id_categoria], references: [id_categoria], onDelete: NoAction, onUpdate: NoAction)
   tienda         tienda?          @relation(fields: [id_tienda], references: [id_tienda], onDelete: NoAction, onUpdate: NoAction)
+  stock          stock?
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -114,4 +114,13 @@ model autenticacion_2fa {
   secreto      String?  @db.VarChar(255)
   temp_secreto String?  @db.VarChar(255)
   usuario      usuario  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction, map: "fk_usuario_2fa")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model stock {
+  id_stock            BigInt    @id @default(autoincrement())
+  id_producto         BigInt    @unique(map: "stock_id_producto_unique")
+  cantidad            Int?      @default(0)
+  fecha_actualizacion DateTime? @default(now()) @db.Timestamp(6)
+  producto            producto  @relation(fields: [id_producto], references: [id_producto], onDelete: Cascade, onUpdate: NoAction)
 }

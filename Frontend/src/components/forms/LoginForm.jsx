@@ -214,7 +214,7 @@ export default function LoginForm({ isOpen, onClose, onSwitchToRegister }) {
                 handleClose();
                 if (onSwitchToRegister) onSwitchToRegister();
               }}
-              className="text-[#8B3A3A] font-medium hover:underline"
+              className="text-[#8B3A3A] font-medium hover:underline cursor-pointer"
             >
               Regístrate aquí
             </span>
