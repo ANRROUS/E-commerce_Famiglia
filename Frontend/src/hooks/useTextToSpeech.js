@@ -141,17 +141,16 @@ export const useTextToSpeech = () => {
       audio.onerror = (e) => {
         console.error('[TTS] Error reproduciendo audio:', e);
         URL.revokeObjectURL(audioUrl);
-        // Fallback a nativo si falla el audio
-        console.log('[TTS] Usando fallback nativo...');
-        speakNative(cleanText, options);
+        // Fallback a nativo ELIMINADO por solicitud del usuario
+        console.log('[TTS] Fallback nativo deshabilitado. No se reproducirá audio.');
       };
 
       await audio.play();
 
     } catch (error) {
       console.error('[TTS] Error en Google TTS:', error);
-      console.log('[TTS] Usando fallback nativo...');
-      speakNative(cleanText, options);
+      // Fallback a nativo ELIMINADO por solicitud del usuario
+      console.log('[TTS] Fallback nativo deshabilitado. No se reproducirá audio.');
     }
   }, [speakNative]);
 
