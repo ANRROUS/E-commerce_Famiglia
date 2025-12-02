@@ -173,6 +173,16 @@ export default function Catalog() {
     setPage(1);
   }, [priceBounds]);
 
+  // Escuchar evento de limpieza de filtros desde MCP
+  useEffect(() => {
+    const handleClearEvent = () => {
+      console.log('[Catalog] Evento voice:clear-filters recibido');
+      handleClearFilters();
+    };
+    window.addEventListener('voice:clear-filters', handleClearEvent);
+    return () => window.removeEventListener('voice:clear-filters', handleClearEvent);
+  }, [handleClearFilters]);
+
   const handleAddToCart = useCallback(
     (product) => {
       dispatch(addToCartAsync(product))
@@ -330,7 +340,7 @@ export default function Catalog() {
       'qué filtros están activos': () => {
         const activos = [];
         if (selectedCategories.length > 0) {
-          const nombresCateg = selectedCategories.map(id => 
+          const nombresCateg = selectedCategories.map(id =>
             categorias.find(c => String(c.id_categoria) === id)?.nombre
           ).filter(Boolean);
           activos.push(`Categorías: ${nombresCateg.join(', ')}`);

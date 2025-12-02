@@ -22,7 +22,7 @@ export const useTextToSpeech = () => {
       };
 
       loadVoices();
-      
+
       // Las voces se cargan de forma asíncrona en algunos navegadores
       if (window.speechSynthesis.onvoiceschanged !== undefined) {
         window.speechSynthesis.onvoiceschanged = loadVoices;
@@ -66,11 +66,17 @@ export const useTextToSpeech = () => {
 
     // Limpiar texto: remover asteriscos y otros marcadores de formato
     const cleanText = text
-      .replace(/\*/g, '')           // Remover asteriscos (énfasis Markdown)
-      .replace(/_{2,}/g, '')        // Remover guiones bajos dobles (negrita Markdown)
-      .replace(/`{1,3}/g, '')       // Remover backticks (código Markdown)
-      .replace(/\s+/g, ' ')         // Normalizar espacios múltiples
-      .trim();                      // Quitar espacios al inicio/final
+      .replace(/\*\*/g, '')           // Remover asteriscos dobles (negrita Markdown)
+      .replace(/\*/g, '')             // Remover asteriscos simples (énfasis Markdown)
+      .replace(/_{2,}/g, '')          // Remover guiones bajos dobles (negrita Markdown)
+      .replace(/`{1,3}/g, '')         // Remover backticks (código Markdown)
+      .replace(/^[\*\-\+]\s+/gm, '')  // Remover viñetas de listas (* - +)
+      .replace(/^\d+\.\s+/gm, '')     // Remover numeración de listas (1. 2. 3.)
+      .replace(/\n\n+/g, '. ')        // Convertir párrafos múltiples en pausas
+      .replace(/\n/g, ', ')           // Convertir saltos de línea simples en pausas cortas
+      .replace(/S\/\s*(\d+(\.\d{2})?)/g, '$1 soles') // Reemplazar S/ por soles
+      .replace(/\s+/g, ' ')           // Normalizar espacios múltiples
+      .trim();                        // Quitar espacios al inicio/final
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = lang;

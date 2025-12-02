@@ -967,6 +967,23 @@ const toolHandlers = {
       message: `Abriendo enlace externo: ${target} `
     };
   },
+  async clearFilters() {
+    const p = await initBrowser();
+    console.error('[clearFilters] Disparando evento voice:clear-filters');
+
+    await p.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('voice:clear-filters'));
+    });
+
+    // Esperar un poco para que React procese el cambio de estado
+    await p.waitForTimeout(500);
+
+    return {
+      success: true,
+      message: 'Filtros limpiados correctamente'
+    };
+  },
+
   async search({ query }) {
     const p = await initBrowser();
 
@@ -1025,47 +1042,91 @@ const toolHandlers = {
 
   async filterByCategory({ category }) {
     const p = await initBrowser();
+    console.error(`[filterByCategory] Filtrando por: ${category}`);
 
-    // Generar selector usando helper o fallback
-    const categorySelector = SELECTORS?.CATALOG_SELECTORS?.filtros?.categoriaButton
-      ? SELECTORS.CATALOG_SELECTORS.filtros.categoriaButton(category)
-      : `button: has - text("${category}")`;
+    // Esperar a que carguen las categorías (fix race condition)
+    try {
+      await p.waitForSelector('button, a[role="button"]', { timeout: 5000 });
+      await p.waitForTimeout(1000);
+    } catch (e) {
+      console.error('[filterByCategory] Timeout esperando categorías');
+    }
 
-    console.error(`[filterByCategory] Filtrando por: ${category} `);
-    console.error(`[filterByCategory] Selector: ${categorySelector} `);
+    try {
+      // Intentar encontrar y clickear el botón usando lógica en el navegador
+      const result = await p.evaluate((targetCategory) => {
+        console.log(`[DOM] Buscando categoría: "${targetCategory}"`);
 
-    // Intentar hacer clic en el botón de categoría
-    const fallbackSelectors = [
-      categorySelector,
-      `[data - category= "${category}"]`,
-      `a: has - text("${category}")`,
-      `.category - ${category.toLowerCase()} `
-    ];
+        // Buscar todos los botones que podrían ser categorías
+        // Buscamos botones dentro de contenedores que parezcan listas o menús, o botones genéricos
+        const buttons = Array.from(document.querySelectorAll('button, a[role="button"], div[role="button"]'));
 
-    for (const selector of fallbackSelectors) {
-      try {
-        await p.click(selector, { timeout: 2000 });
-        await p.waitForTimeout(500);
+        // Filtrar botones que tienen texto visible
+        const candidates = buttons.filter(btn => {
+          const text = btn.textContent?.trim();
+          // Ignorar botones vacíos, muy largos o que parecen ser de otras acciones (cerrar, menú, etc)
+          return text && text.length > 2 && text.length < 30 && !['cerrar', 'filtro', 'buscar'].includes(text.toLowerCase());
+        });
 
-        // Obtener datos detallados de los productos filtrados
+        console.log(`[DOM] Candidatos encontrados: ${candidates.length}`);
+
+        const target = targetCategory.toLowerCase();
+
+        // Estrategia 1: Coincidencia exacta (case-insensitive)
+        let match = candidates.find(btn => btn.textContent.trim().toLowerCase() === target);
+
+        // Estrategia 2: Contiene la palabra (ej: "Panes" contiene "Pan")
+        if (!match) {
+          match = candidates.find(btn => btn.textContent.trim().toLowerCase().includes(target));
+        }
+
+        // Estrategia 3: La categoría contiene el texto del botón (ej: "Pan" está en "Panes")
+        if (!match) {
+          match = candidates.find(btn => target.includes(btn.textContent.trim().toLowerCase()));
+        }
+
+        // Estrategia 4: Singular/Plural simple (quitar 's' o 'es')
+        if (!match) {
+          const singular = target.replace(/es$/, '').replace(/s$/, '');
+          if (singular.length > 2) {
+            match = candidates.find(btn => btn.textContent.trim().toLowerCase().includes(singular));
+          }
+        }
+
+        if (match) {
+          console.log(`[DOM] ✓ Encontrado botón: "${match.textContent}" para categoría "${targetCategory}"`);
+          match.click();
+          return { success: true, foundText: match.textContent };
+        }
+
+        // Si falla, devolver lista de opciones para debug
+        const options = candidates.map(b => b.textContent.trim()).slice(0, 15);
+        return { success: false, options };
+
+      }, category);
+
+      if (result.success) {
+        await p.waitForTimeout(1000); // Esperar a que carguen los productos
         const productsData = await toolHandlers.getProductsData({ limit: 5 });
 
-        console.error(`[filterByCategory] ✓ Filtro aplicado con selector: ${selector} `);
+        console.error(`[filterByCategory] ✓ Filtro aplicado: ${result.foundText}`);
 
         return {
           success: true,
           category,
           filtered: true,
-          selector,
-          products: productsData.products // Incluir datos de productos
+          matchedText: result.foundText,
+          products: productsData.products
         };
-      } catch (e) {
-        continue;
+      } else {
+        console.error(`[filterByCategory] ✗ No se encontró. Opciones visibles: ${result.options.join(', ')}`);
+        throw new Error(`No se encontró la categoría: ${category}. Disponibles: ${result.options.join(', ')}`);
       }
-    }
 
-    console.error(`[filterByCategory] ✗ No se encontró la categoría: ${category} `);
-    throw new Error(`No se encontró la categoría: ${category} `);
+    } catch (e) {
+      console.error(`[filterByCategory] Error: ${e.message}`);
+      throw e;
+    }
   },
 
   async filterByPrice({ minPrice, maxPrice }) {
@@ -1317,12 +1378,14 @@ const toolHandlers = {
   async addProductToCart({ productName, productId, quantity = 1 }) {
     const p = await initBrowser();
 
-    console.error(`[addProductToCart] Buscando producto: ${productName || productId} `);
+    // Convertir a string para evitar errores con números
+    const searchTerm = String(productName || productId || '');
+    console.error(`[addProductToCart] Buscando producto: ${searchTerm}`);
 
     try {
       // Buscar y hacer click directamente en el DOM para evitar problemas de navegación
-      const result = await p.evaluate(([searchName, searchId]) => {
-        console.log(`[DOM] Buscando producto: ${searchName || searchId} `);
+      const result = await p.evaluate((searchName) => {
+        console.log(`[DOM] Buscando producto: "${searchName}"`);
 
         // Buscar todas las tarjetas de productos con estructura Tailwind
         const productCards = Array.from(document.querySelectorAll('div[class*="bg-white"][class*="rounded-lg"][class*="shadow"], div[class*="border-red-300"]'));
@@ -1336,11 +1399,21 @@ const toolHandlers = {
         let targetCard = null;
         let targetProductName = '';
 
+        // Convertir searchName a string y a minúsculas para búsqueda
+        const searchLower = String(searchName || '').toLowerCase();
+        const searchLowerSpaces = searchLower.replace(/-/g, ' '); // Manejar guiones (ej: "mixto-completo" -> "mixto completo")
+
         for (const card of productCards) {
           const nameEl = card.querySelector('h3, h4, [class*="font-bold"]:not([class*="text-red"])');
           const productName = nameEl?.textContent?.trim() || '';
+          const cardId = card.dataset.productId || card.dataset.id || '';
 
-          if (searchName && productName.toLowerCase().includes(searchName.toLowerCase())) {
+          // Búsqueda flexible: coincidencia parcial de nombre O ID exacto
+          if (
+            (searchLower && productName.toLowerCase().includes(searchLower)) ||
+            (searchLowerSpaces && productName.toLowerCase().includes(searchLowerSpaces)) ||
+            (cardId && cardId === searchName)
+          ) {
             targetCard = card;
             targetProductName = productName;
             break;
@@ -1348,7 +1421,7 @@ const toolHandlers = {
         }
 
         if (!targetCard) {
-          return { success: false, error: `No se encontró el producto: ${searchName || searchId} ` };
+          return { success: false, error: `No se encontró el producto: ${searchName}` };
         }
 
         console.log(`[DOM] Producto encontrado: ${targetProductName} `);
@@ -1375,7 +1448,7 @@ const toolHandlers = {
           clicked: true
         };
 
-      }, [productName, productId]);
+      }, searchTerm);
 
       if (!result.success) {
         throw new Error(result.error);
@@ -1401,52 +1474,9 @@ const toolHandlers = {
   },
 
   // CARRITO
-  async addToCart({ productId, quantity = 1 }) {
-    const p = await initBrowser();
-
-    // Si hay cantidad > 1, llenar el input de cantidad
-    if (quantity > 1) {
-      const quantitySelectors = [
-        'input[name="cantidad"]',
-        'input[name="quantity"]',
-        'input[type="number"]'
-      ];
-
-      for (const selector of quantitySelectors) {
-        try {
-          const input = await p.$(selector);
-          if (input) {
-            await input.fill(quantity.toString());
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-    }
-
-    // Hacer clic en "Agregar al carrito" usando selectores mapeados
-    const addButtonSelector = SELECTORS?.CATALOG_SELECTORS?.productos?.agregar ||
-      'button:has-text("Agregar al carrito"), button:has-text("Agregar"), button:has-text("Añadir al carrito")';
-
-    console.error(`[addToCart] Usando selector: ${addButtonSelector} `);
-
-    try {
-      await p.click(addButtonSelector, { timeout: 3000 });
-      await p.waitForTimeout(500);
-
-      console.error('[addToCart] ✓ Producto agregado al carrito');
-
-      return {
-        success: true,
-        productId,
-        quantity,
-        addedToCart: true
-      };
-    } catch (error) {
-      console.error('[addToCart] ✗ Error agregando al carrito:', error.message);
-      throw new Error('No se encontró el botón para agregar al carrito');
-    }
+  async addToCart({ productId, productName, quantity = 1 }) {
+    console.error(`[addToCart] Redirigiendo a addProductToCart. ID: ${productId}, Name: ${productName}`);
+    return this.addProductToCart({ productId, productName, quantity });
   },
 
   async updateCartQuantity({ itemId, quantity, productName }) {
@@ -1479,7 +1509,7 @@ const toolHandlers = {
 
       // Primero intentar con el itemId proporcionado
       const targetExists = await p.evaluate((id) => {
-        const target = document.querySelector(`[data - item - id= "${id}"]`);
+        const target = document.querySelector(`[data-item-id="${id}"]`);
         if (!target) return { exists: false };
 
         return {
@@ -1547,7 +1577,7 @@ const toolHandlers = {
       }
 
       // Opción 1: Intentar con input directo (menos común en esta app)
-      const input = await p.$(`[data - item - id= "${realItemId}"]input[type = "number"]`);
+      const input = await p.$(`[data-item-id="${realItemId}"] input[type="number"]`);
 
       if (input) {
         await input.fill(quantity.toString());
@@ -1565,9 +1595,9 @@ const toolHandlers = {
       // Opción 2: Usar botones + y - (patrón de esta app)
       // Obtener cantidad actual
       const currentQuantity = await p.evaluate((id) => {
-        const container = document.querySelector(`[data - item - id= "${id}"]`);
+        const container = document.querySelector(`[data-item-id="${id}"]`);
         if (!container) {
-          console.log(`[DOM] ✗ No se encontró contenedor con data - item - id="${id}"`);
+          console.log(`[DOM] ✗ No se encontró contenedor con data-item-id="${id}"`);
           return 1;
         }
 
@@ -1603,9 +1633,9 @@ const toolHandlers = {
         // Aumentar: hacer clic en botón "+"
         // El botón + tiene el ícono <Add /> y es el último botón del QuantitySelector
         const plusSelectors = [
-          `[data - item - id= "${realItemId}"]button.MuiIconButton - root: has(svg[data - testid= "AddIcon"])`,
-          `[data - item - id= "${realItemId}"] .MuiIconButton - root: last - of - type`,
-          `[data - item - id="${realItemId}"]button: has([data - testid="AddIcon"])`
+          `[data-item-id="${realItemId}"] button.MuiIconButton-root:has(svg[data-testid="AddIcon"])`,
+          `[data-item-id="${realItemId}"] .MuiIconButton-root:last-of-type`,
+          `[data-item-id="${realItemId}"] button:has([data-testid="AddIcon"])`
         ];
 
         let clicked = false;
@@ -1633,9 +1663,9 @@ const toolHandlers = {
         // Disminuir: hacer clic en botón "-"
         // El botón - tiene el ícono <Remove /> y es el primer botón del QuantitySelector
         const minusSelectors = [
-          `[data - item - id= "${realItemId}"]button.MuiIconButton - root: has(svg[data - testid= "RemoveIcon"])`,
-          `[data - item - id= "${realItemId}"] .MuiIconButton - root: first - of - type`,
-          `[data - item - id="${realItemId}"]button: has([data - testid="RemoveIcon"])`
+          `[data-item-id="${realItemId}"] button.MuiIconButton-root:has(svg[data-testid="RemoveIcon"])`,
+          `[data-item-id="${realItemId}"] .MuiIconButton-root:first-of-type`,
+          `[data-item-id="${realItemId}"] button:has([data-testid="RemoveIcon"])`
         ];
 
         let clicked = false;
@@ -1702,7 +1732,7 @@ const toolHandlers = {
 
       // Primero intentar con el itemId proporcionado
       const targetExists = await p.evaluate((id) => {
-        const target = document.querySelector(`[data - item - id= "${id}"]`);
+        const target = document.querySelector(`[data-item-id="${id}"]`);
         return { exists: !!target };
       }, itemId);
 
@@ -1760,11 +1790,11 @@ const toolHandlers = {
 
       // Buscar botón de eliminar (CloseIcon)
       const removeSelectors = [
-        `[data - item - id= "${realItemId}"]svg[data - testid= "CloseIcon"]`, // Directo al icono
-        `[data - item - id= "${realItemId}"]button: has(svg[data - testid= "CloseIcon"])`, // Botón que contiene el icono
-        `[data - item - id= "${realItemId}"][data - testid="CloseIcon"]`,
-        `[data - item - id= "${realItemId}"]button[aria - label= "delete"]`,
-        `[data - item - id= "${realItemId}"]button[aria - label= "remove"]`
+        `[data-item-id="${realItemId}"] svg[data-testid="CloseIcon"]`, // Directo al icono
+        `[data-item-id="${realItemId}"] button:has(svg[data-testid="CloseIcon"])`, // Botón que contiene el icono
+        `[data-item-id="${realItemId}"] [data-testid="CloseIcon"]`,
+        `[data-item-id="${realItemId}"] button[aria-label="delete"]`,
+        `[data-item-id="${realItemId}"] button[aria-label="remove"]`
       ];
 
       let clicked = false;
@@ -1848,7 +1878,9 @@ const toolHandlers = {
   async fillPhoneNumber({ phoneNumber }) {
     const p = await initBrowser();
 
-    console.error(`[fillPhoneNumber] Llenando teléfono: ${phoneNumber} `);
+    // Convertir a string si es número
+    const phoneStr = String(phoneNumber);
+    console.error(`[fillPhoneNumber] Llenando teléfono: ${phoneStr} `);
 
     try {
       // Selectores específicos para el campo de teléfono
@@ -1858,7 +1890,7 @@ const toolHandlers = {
         'input[name="phoneNumber"]', // Por name si existe
         'input[type="tel"]', // Por type tel
         'label:has-text("Número de Teléfono") + div input', // Por label text
-        '.MuiTextField-root:has(label:contains("Teléfono")) input' // MUI con label
+        '.MuiTextField-root:has(label:has-text("Teléfono")) input' // MUI con label
       ];
 
       let filled = false;
@@ -1871,7 +1903,7 @@ const toolHandlers = {
           await p.waitForTimeout(100);
 
           // Llenar con número
-          await p.fill(selector, phoneNumber);
+          await p.fill(selector, phoneStr);
           await p.waitForTimeout(300);
 
           console.error(`[fillPhoneNumber] ✓ Teléfono llenado con selector: ${selector} `);
@@ -1902,7 +1934,9 @@ const toolHandlers = {
   async fillVerificationCode({ verificationCode }) {
     const p = await initBrowser();
 
-    console.error(`[fillVerificationCode] Llenando código: ${verificationCode} `);
+    // Convertir a string si es número
+    const codeStr = String(verificationCode);
+    console.error(`[fillVerificationCode] Llenando código: ${codeStr} `);
 
     try {
       // Selectores específicos para el campo de código de verificación
@@ -1912,7 +1946,7 @@ const toolHandlers = {
         'input[label*="Verificación"]', // Por label que contenga "Verificación"
         'input[name="verificationCode"]', // Por name si existe
         'label:has-text("Código de Verificación") + div input', // Por label text
-        '.MuiTextField-root:has(label:contains("Código")) input' // MUI con label
+        '.MuiTextField-root:has(label:has-text("Código")) input' // MUI con label
       ];
 
       let filled = false;
@@ -1925,7 +1959,7 @@ const toolHandlers = {
           await p.waitForTimeout(100);
 
           // Llenar con código
-          await p.fill(selector, verificationCode);
+          await p.fill(selector, codeStr);
           await p.waitForTimeout(300);
 
           console.error(`[fillVerificationCode] ✓ Código llenado con selector: ${selector} `);
@@ -2270,41 +2304,59 @@ const toolHandlers = {
     const p = await initBrowser();
 
     // Ir a la página del carrito primero
-    await p.goto(`${APP_URL}/cart`, { waitUntil: 'networkidle' });
-    await p.waitForTimeout(500);
+    console.error('[checkout] Navegando al carrito...');
+    await p.goto(`${APP_URL}/cart`, { waitUntil: 'domcontentloaded' });
+    await p.waitForTimeout(1500); // Esperar a que cargue React
 
-    // Hacer clic en "Proceder al pago" usando selectores mapeados
-    const checkoutSelector = SELECTORS?.CART_SELECTORS?.procederAlPago ||
-      'button:has-text("Proceder al pago")';
+    // Verificar si el carrito está vacío
+    try {
+      const emptyMsg = await p.$('text="Tu carrito está vacío"');
+      if (emptyMsg && await emptyMsg.isVisible()) {
+        throw new Error('El carrito está vacío, agrega productos antes de pagar.');
+      }
+    } catch (e) { }
 
-    console.error(`[checkout] Usando selector: ${checkoutSelector}`);
-
-    const fallbackSelectors = [
-      checkoutSelector,
+    // Hacer clic en "Proceder al pago"
+    const checkoutSelectors = [
+      'button:has-text("Proceder al pago")',
+      'button:has-text("Proceder al Pago")',
+      'button:has-text("Continuar compra")',
       'button:has-text("Pagar")',
       'a[href="/payment"]',
-      '.checkout-button'
+      'a[href="/checkout"]',
+      '.checkout-button',
+      'button.MuiButton-containedPrimary' // Botón principal suele ser el de pago
     ];
 
-    for (const selector of fallbackSelectors) {
+    console.error(`[checkout] Buscando botón de pago...`);
+
+    for (const selector of checkoutSelectors) {
       try {
-        await p.click(selector, { timeout: 2000 });
-        await p.waitForTimeout(1000);
-
-        console.error('[checkout] ✓ Navegado a checkout');
-
-        return {
-          success: true,
-          currentUrl: p.url(),
-          navigatedToCheckout: true
-        };
-      } catch (e) {
-        continue;
-      }
+        const btn = await p.$(selector);
+        if (btn && await btn.isVisible() && await btn.isEnabled()) {
+          await btn.click();
+          console.error(`[checkout] ✓ Click en: ${selector}`);
+          await p.waitForTimeout(1000);
+          return {
+            success: true,
+            currentUrl: p.url(),
+            navigatedToCheckout: true
+          };
+        }
+      } catch (e) { continue; }
     }
 
+    // Si falla, intentar buscar cualquier botón "Continuar"
+    try {
+      const continueBtn = await p.$('button:has-text("Continuar")');
+      if (continueBtn) {
+        await continueBtn.click();
+        return { success: true, method: 'generic-continue' };
+      }
+    } catch (e) { }
+
     console.error('[checkout] ✗ No se encontró el botón de checkout');
-    throw new Error('No se encontró el botón de checkout');
+    throw new Error('No se encontró el botón de checkout. Asegúrate de tener productos en el carrito.');
   },
 
   async debugCartDOM() {

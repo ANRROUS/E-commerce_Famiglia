@@ -32,7 +32,25 @@ export const processVoiceCommand = async (req, res) => {
       userEmail: req.user?.correo || null,
       userRole: context.user?.rol || req.user?.rol || 'guest',
       savedAddress: req.user?.direccion || null,
-      userPhone: req.user?.telefono || null
+      userPhone: req.user?.telefono || null,
+      // 🏪 Información del negocio (para responder preguntas)
+      businessInfo: {
+        name: 'Pastelería Famiglia',
+        address: 'Av. Gral. Antonio Álvarez de Arenales 458, Jesús María',
+        district: 'Jesús María',
+        city: 'Lima',
+        country: 'Perú',
+        rubro: 'Panadería, pastelería y snack bar',
+        category: 'Pastelería y panadería artesanal',
+        specialty: 'Comida italiana - Panes, postres, tortas, salados y bebidas',
+        phone: '+51 999 999 999', // TODO: Actualizar con número real
+        email: 'info@famiglia.pe', // TODO: Actualizar con email real
+        googleMapsUrl: 'https://maps.app.goo.gl/rYYDD2HYf5QmBSDq7',
+        socialMedia: {
+          instagram: '@famiglia.pe',
+          facebook: 'Famiglia Pastelería'
+        }
+      }
     };
 
     logger.info('Voice command received', {

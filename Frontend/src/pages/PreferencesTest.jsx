@@ -19,7 +19,7 @@ const PreferencesTest = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { speak, registerCommands, unregisterCommands } = useVoice();
-  
+
   const {
     questions,
     answers,
@@ -111,11 +111,11 @@ const PreferencesTest = () => {
           speak('No hay opciones disponibles');
           return;
         }
-        
+
         // Buscar opción por número o texto
         const opcionLower = opcion.toLowerCase();
         let selectedAnswer = null;
-        
+
         if (opcionLower === 'uno' || opcionLower === '1' || opcionLower === 'primero') {
           selectedAnswer = currentQ.opciones[0];
         } else if (opcionLower === 'dos' || opcionLower === '2' || opcionLower === 'segundo') {
@@ -124,11 +124,11 @@ const PreferencesTest = () => {
           selectedAnswer = currentQ.opciones[2];
         } else {
           // Buscar por texto
-          selectedAnswer = currentQ.opciones.find(opt => 
+          selectedAnswer = currentQ.opciones.find(opt =>
             opt.toLowerCase().includes(opcionLower)
           );
         }
-        
+
         if (selectedAnswer) {
           handleAnswerSelect(selectedAnswer);
           speak(`Opción seleccionada: ${selectedAnswer}`);
@@ -195,6 +195,79 @@ const PreferencesTest = () => {
           speak('Obteniendo tu recomendación');
           dispatch(getRecommendation());
         }
+      },
+      // NUEVOS COMANDOS DE LECTURA
+      'leer pregunta': () => {
+        if (questions.length === 0 || testCompleted) {
+          speak('No hay preguntas disponibles');
+          return;
+        }
+        const currentQ = questions[currentQuestion];
+        speak(`Pregunta ${currentQuestion + 1} de ${questions.length}: ${currentQ?.question}`);
+      },
+      'leer opciones': () => {
+        if (questions.length === 0 || testCompleted) {
+          speak('No hay opciones disponibles');
+          return;
+        }
+        const currentQ = questions[currentQuestion];
+        if (!currentQ?.options) {
+          speak('No hay opciones para esta pregunta');
+          return;
+        }
+        const optionsText = currentQ.options.map((opt, i) =>
+          `Opción ${i + 1}: ${opt.label}`
+        ).join('. ');
+        speak(optionsText);
+      },
+      'leer todo': () => {
+        if (questions.length === 0 || testCompleted) {
+          speak('No hay preguntas disponibles');
+          return;
+        }
+        const currentQ = questions[currentQuestion];
+        const questionText = `Pregunta ${currentQuestion + 1} de ${questions.length}: ${currentQ?.question}`;
+        const optionsText = currentQ.options.map((opt, i) =>
+          `Opción ${i + 1}: ${opt.label}`
+        ).join('. ');
+        speak(`${questionText}. ${optionsText}`);
+      },
+      'leer recomendación': () => {
+        if (!testCompleted) {
+          speak('Debes completar el test primero');
+          return;
+        }
+        if (!recommendation || !recommendation.product) {
+          speak('No hay recomendación disponible');
+          return;
+        }
+        const productName = recommendation.product.nombre || recommendation.product.name;
+        const message = recommendation.message || 'Basado en tus respuestas, te recomendamos';
+        const explanation = recommendation.explanation || 'Este producto se ajusta a tus preferencias';
+        speak(`${message}: ${productName}. ${explanation}`);
+      },
+      'qué me recomendaste': () => {
+        if (!testCompleted) {
+          speak('Debes completar el test primero');
+          return;
+        }
+        if (!recommendation || !recommendation.product) {
+          speak('No hay recomendación disponible');
+          return;
+        }
+        const productName = recommendation.product.nombre || recommendation.product.name;
+        speak(`Te recomendamos: ${productName}`);
+      },
+      'por qué esa recomendación': () => {
+        if (!testCompleted) {
+          speak('Debes completar el test primero');
+          return;
+        }
+        if (!recommendation?.explanation) {
+          speak('No hay explicación disponible');
+          return;
+        }
+        speak(recommendation.explanation);
       },
     };
 
@@ -296,11 +369,10 @@ const PreferencesTest = () => {
                 <button
                   key={index}
                   onClick={() => handleAnswerSelect(option.value)}
-                  className={`w-full text-left p-3 sm:p-4 rounded-lg border-2 transition-all ${
-                    answers[currentQuestion] === option.value
+                  className={`w-full text-left p-3 sm:p-4 rounded-lg border-2 transition-all ${answers[currentQuestion] === option.value
                       ? 'border-[#6b2c2c] bg-[#f5e6d3]'
                       : 'border-[#b17b6b] hover:border-[#6b2c2c] hover:bg-[#fef9f3]'
-                  }`}
+                    }`}
                 >
                   <div className="font-medium text-[#6b2c2c] text-sm sm:text-base">{option.label}</div>
                   {option.description && (
@@ -360,9 +432,9 @@ const PreferencesTest = () => {
 
               {recommendation.product.id_producto && (
                 <div className="flex justify-center">
-                  <ProductCard 
-                    key={`rec-${recommendation.product.id_producto}`} 
-                    product={recommendation.product} 
+                  <ProductCard
+                    key={`rec-${recommendation.product.id_producto}`}
+                    product={recommendation.product}
                   />
                 </div>
               )}

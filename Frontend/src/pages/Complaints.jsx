@@ -25,7 +25,6 @@ const Complaints = () => {
           type: "success",
           message: "Tu reclamo fue enviado correctamente. ¡Gracias por tu tiempo!",
         });
-        speak("Tu reclamo fue enviado correctamente");
         setNombre("");
         setCorreo("");
         setMotivo("");
@@ -35,7 +34,6 @@ const Complaints = () => {
           type: "error",
           message: "Ocurrió un error al enviar tu reclamo. Revisa los campos e intenta nuevamente.",
         });
-        speak("Faltan campos por completar");
       }
       setLoading(false);
     }, 1000);
@@ -104,11 +102,35 @@ const Complaints = () => {
         if (!nombre) faltantes.push('nombre');
         if (!correo) faltantes.push('correo');
         if (!motivo) faltantes.push('motivo');
-        
+
         if (faltantes.length === 0) {
           speak('Todos los campos están completos');
         } else {
           speak(`Faltan los siguientes campos: ${faltantes.join(', ')}`);
+        }
+      },
+
+      // Leer resultado
+      'leer resultado': () => {
+        if (!alert.show) {
+          speak('No hay resultados todavía. Envía el formulario primero');
+          return;
+        }
+        if (alert.type === 'success') {
+          speak('Tu reclamo fue enviado correctamente. Gracias por tu tiempo');
+        } else {
+          speak('Ocurrió un error al enviar tu reclamo. Puedes intentarlo nuevamente más tarde');
+        }
+      },
+      'se envió el reclamo': () => {
+        if (!alert.show) {
+          speak('No hay resultados todavía');
+          return;
+        }
+        if (alert.type === 'success') {
+          speak('Sí, tu reclamo fue enviado exitosamente');
+        } else {
+          speak('No, ocurrió un error. Intenta enviarlo de nuevo');
         }
       },
     };
@@ -121,7 +143,18 @@ const Complaints = () => {
       console.log('[Complaints] 🗑️ Comandos eliminados');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nombre, correo, motivo, speak]);
+  }, [nombre, correo, motivo, alert, speak]);
+
+  // Efecto para leer automáticamente el resultado del envío
+  useEffect(() => {
+    if (alert.show) {
+      if (alert.type === 'success') {
+        speak('Tu reclamo fue enviado correctamente. Gracias por tu tiempo');
+      } else {
+        speak('Ocurrió un error al enviar tu reclamo. Puedes intentarlo nuevamente más tarde');
+      }
+    }
+  }, [alert.show, alert.type, speak]);
 
   return (
     <Box
@@ -217,7 +250,7 @@ const Complaints = () => {
             },
           }}
         />
-        
+
         <Typography sx={{ fontWeight: 700, fontSize: "0.9rem", mt: 1 }}>
           Motivo del reclamo:
         </Typography>

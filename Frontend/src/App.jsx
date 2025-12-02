@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { LoginModalProvider } from "./context/LoginModalContext";
@@ -9,6 +9,7 @@ import { VoiceAvatarFloating } from "./components/voice/VoiceAvatarFloating";
 import { usePageGreeting } from "./hooks/usePageGreeting";
 import VoiceSettingsModal from "./components/common/VoiceSettingsModal";
 import { useVoice } from "./context/VoiceContext";
+import { useVoiceEvents } from "./hooks/useVoiceEvents";
 import Home from "./pages/Home";
 import Footer from "./components/layout/Footer";
 import Header from "./components/layout/Header";
@@ -46,8 +47,14 @@ function Layout() {
   const { isLoginModalOpen, hideLoginModal } = useLoginModal();
   const { isSettingsModalOpen, closeSettingsModal, openSettingsModal, registerCommands, unregisterCommands, speak } = useVoice();
 
-  // 1. Saludo contextual por página
-  usePageGreeting();
+  // Estado para controlar modales del Footer desde voz
+  const [footerModalState, setFooterModalState] = useState(null);
+
+  // 🎤 Escuchar eventos de voz (openModal, openExternalLink)
+  useVoiceEvents(setFooterModalState);
+
+  // 1. Saludo contextual por página (DESHABILITADO - el usuario no quiere saludos automáticos)
+  // usePageGreeting();
 
   // 2. Registrar comandos globales de configuración
   useEffect(() => {
@@ -179,7 +186,7 @@ function Layout() {
         </Routes>
       </main>
 
-      <Footer />
+      <Footer externalSetOpenModal={setFooterModalState} />
       <LoginForm isOpen={isLoginModalOpen} onClose={hideLoginModal} />
       <VoiceSettingsModal isOpen={isSettingsModalOpen} onClose={closeSettingsModal} />
 

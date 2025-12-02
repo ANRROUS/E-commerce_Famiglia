@@ -230,7 +230,7 @@ export const CATALOG_SELECTORS = {
     imagen: 'img',
     nombre: '.text-lg.font-semibold',
     precio: '.text-xl.font-bold',
-    agregar: 'button:has-text("Agregar")',
+    agregar: 'button:has-text("Añadir al carrito"), button:has-text("Agregar")',
     firstCard: '.MuiCard-root:first-of-type',
   },
 
@@ -350,7 +350,7 @@ export const SELECTOR_GENERATORS = {
   /**
    * Genera selector para botón "Agregar" de producto específico
    */
-  addToCartByIndex: (index) => `.MuiCard-root:nth-of-type(${index + 1}) button:has-text("Agregar")`,
+  addToCartByIndex: (index) => `.MuiCard-root:nth-of-type(${index + 1}) button:has-text("Añadir al carrito"), .MuiCard-root:nth-of-type(${index + 1}) button:has-text("Agregar")`,
 
   /**
    * Genera selector para input por placeholder

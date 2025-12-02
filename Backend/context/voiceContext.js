@@ -28,11 +28,12 @@ export const VOICE_CONTEXT = {
   // CONTEXTO DE PRODUCTOS
   products: {
     categories: {
-      "Pan": ["pan francés", "pan integral", "pan molde", "baguette", "ciabatta"],
-      "Postres": ["torta", "cake", "pastel", "flan", "cheesecake", "tiramisú"],
-      "Galletas": ["galletas de avena", "cookies", "alfajores", "macarons"],
-      "Empanadas": ["empanada de pollo", "empanada de carne", "empanada de queso"],
-      "Bebidas": ["café", "té", "jugos", "agua", "gaseosas"]
+      "Bebidas": ["café", "té", "jugos", "agua", "gaseosas", "maracuyá", "jugo surtido"],
+      "Panes": ["pan francés", "pan integral", "pan molde", "baguette", "ciabatta", "baguettino"],
+      "Postres": ["cake", "pastel", "flan", "cheesecake", "tiramisú", "pie"],
+      "Salados": ["empanada de pollo", "empanada de carne", "empanada de queso", "quiche"],
+      "Sanguches": ["sándwich", "sandwich", "bocadillo", "hamburguesa"],
+      "Tortas": ["torta", "pastel", "cake", "tarta"]
     },
     defaultUnit: "unidad",
     availableHours: "Lunes a Domingo de 7:00 AM a 9:00 PM"
@@ -46,11 +47,11 @@ export const VOICE_CONTEXT = {
     productList: (products) => {
       if (products.length === 0) return "No encontré productos disponibles en este momento.";
       if (products.length === 1) return `El producto disponible es: ${products[0].nombre} a S/ ${products[0].precio.toFixed(2)}`;
-      
-      const list = products.map((p, idx) => 
+
+      const list = products.map((p, idx) =>
         `${idx + 1}. ${p.nombre} a S/ ${p.precio.toFixed(2)}`
       ).join(', ');
-      
+
       return `Los productos que encuentro son: ${list}`;
     },
     orderConfirmation: "Perfecto, he agregado el producto a tu carrito.",
@@ -107,9 +108,9 @@ export function isCarrotalQuery(text) {
   const lowerText = text.toLowerCase();
   const totalKeywords = ['total', 'cuánto debo', 'precio total', 'cuánto es', 'cuánto cuesta todo', 'suma total'];
   const cartKeywords = ['carrito', 'carro', 'compra'];
-  
-  return totalKeywords.some(keyword => lowerText.includes(keyword)) && 
-         cartKeywords.some(keyword => lowerText.includes(keyword));
+
+  return totalKeywords.some(keyword => lowerText.includes(keyword)) &&
+    cartKeywords.some(keyword => lowerText.includes(keyword));
 }
 
 /**

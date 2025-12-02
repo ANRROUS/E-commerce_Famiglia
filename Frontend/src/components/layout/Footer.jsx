@@ -15,9 +15,17 @@ import Terminos from "../../pages/TerminosPage";
 import Privacidad from "../../pages/PrivacidadPage";
 import QuienesSomos from "../../pages/QuienesSomosPage";
 
-const Footer = () => {
-  const [openModal, setOpenModal] = useState(null); // null | "terminos" | "privacidad" | "quienes"
+const Footer = ({ externalSetOpenModal = null }) => {
+  const [openModal, setOpenModalInternal] = useState(null); // null | "terminos" | "privacidad" | "quienes"
   const navigate = useNavigate();
+
+  // Wrapper que actualiza tanto el estado interno como el externo
+  const setOpenModal = (value) => {
+    setOpenModalInternal(value);
+    if (externalSetOpenModal) {
+      externalSetOpenModal(value);
+    }
+  };
 
   const handleItemClick = (item) => {
     if (item === "Ubicación") {
@@ -144,9 +152,8 @@ const Footer = () => {
                     <li
                       key={i}
                       onClick={item.action || (section.title === "Categorías" ? handleCategoriaClick : null)}
-                      className={`text-white cursor-pointer ${
-                        item.action || section.title === "Categorías" ? "hover:underline" : ""
-                      }`}
+                      className={`text-white cursor-pointer ${item.action || section.title === "Categorías" ? "hover:underline" : ""
+                        }`}
                       style={{
                         fontFamily: "Montserrat, sans-serif",
                         fontWeight: 400,
@@ -210,8 +217,8 @@ const Footer = () => {
           openModal === "terminos"
             ? "Términos y Condiciones"
             : openModal === "privacidad"
-            ? "Política de Privacidad"
-            : "Quiénes Somos"
+              ? "Política de Privacidad"
+              : "Quiénes Somos"
         }
       >
         {openModal === "terminos" && <Terminos />}

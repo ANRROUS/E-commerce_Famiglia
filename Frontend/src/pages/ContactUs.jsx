@@ -27,7 +27,7 @@ const palette = {
 
 const ContactUs = () => {
   const { speak, registerCommands, unregisterCommands } = useVoice();
-  
+
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [mensaje, setMensaje] = useState("");
@@ -39,7 +39,44 @@ const ContactUs = () => {
   // ============================================
   useEffect(() => {
     const voiceCommands = {
+      // LEER INFORMACIÓN DE CONTACTO
+      'leer teléfono': () => {
+        speak('Nuestro número de llamada es: más cincuenta y uno, nueve treinta y tres, cero cuarenta y tres, cero sesenta y seis');
+      },
+      'leer número': () => {
+        speak('Nuestro número de llamada es: más cincuenta y uno, nueve treinta y tres, cero cuarenta y tres, cero sesenta y seis');
+      },
+      'cuál es el teléfono': () => {
+        speak('Puedes llamarnos al: más cincuenta y uno, nueve treinta y tres, cero cuarenta y tres, cero sesenta y seis');
+      },
+      'leer email': () => {
+        speak('Nuestro correo electrónico es: luna romero arroba famiglia punto com');
+      },
+      'leer correo': () => {
+        speak('Nuestro correo electrónico es: luna romero arroba famiglia punto com');
+      },
+      'cuál es el email': () => {
+        speak('Puedes escribirnos a: luna romero arroba famiglia punto com');
+      },
+      'leer ubicación': () => {
+        speak('Nuestra ubicación es: Avenida Arenales 330, Lima');
+      },
+      'dónde están ubicados': () => {
+        speak('Estamos ubicados en: Avenida Arenales 330, Lima');
+      },
+      'cuál es la dirección': () => {
+        speak('Nuestra dirección es: Avenida Arenales 330, Lima');
+      },
+      'leer toda la información': () => {
+        speak('Número de llamada: más cincuenta y uno, nueve treinta y tres, cero cuarenta y tres, cero sesenta y seis. Email: luna romero arroba famiglia punto com. Ubicación: Avenida Arenales 330, Lima');
+      },
+
+      // LLENAR FORMULARIO
       'llenar nombre (.+)': (nombreVoz) => {
+        setNombre(nombreVoz);
+        speak(`Nombre ingresado: ${nombreVoz}`);
+      },
+      'mi nombre es (.+)': (nombreVoz) => {
         setNombre(nombreVoz);
         speak(`Nombre ingresado: ${nombreVoz}`);
       },
@@ -47,10 +84,20 @@ const ContactUs = () => {
         setEmail(emailVoz);
         speak(`Email ingresado: ${emailVoz}`);
       },
+      'mi correo es (.+)': (emailVoz) => {
+        setEmail(emailVoz);
+        speak(`Correo ingresado: ${emailVoz}`);
+      },
       'llenar mensaje (.+)': (mensajeVoz) => {
         setMensaje(mensajeVoz);
         speak(`Mensaje ingresado`);
       },
+      'mi mensaje es (.+)': (mensajeVoz) => {
+        setMensaje(mensajeVoz);
+        speak(`Mensaje ingresado`);
+      },
+
+      // ENVIAR FORMULARIO
       'enviar mensaje': () => {
         if (!nombre || !email || !mensaje) {
           speak('Por favor completa todos los campos antes de enviar');
@@ -61,15 +108,66 @@ const ContactUs = () => {
           return;
         }
         speak('Enviando mensaje');
-        // Simular submit
         const form = document.querySelector('form');
         if (form) form.requestSubmit();
       },
+      'enviar formulario': () => {
+        if (!nombre || !email || !mensaje) {
+          speak('Por favor completa todos los campos antes de enviar');
+          return;
+        }
+        if (loading) {
+          speak('Ya se está enviando el mensaje');
+          return;
+        }
+        speak('Enviando formulario');
+        const form = document.querySelector('form');
+        if (form) form.requestSubmit();
+      },
+
+      // LEER RESULTADO
+      'leer resultado': () => {
+        if (!alert.show) {
+          speak('No hay resultados todavía. Envía el formulario primero');
+          return;
+        }
+        if (alert.type === 'success') {
+          speak('Tu mensaje fue enviado correctamente');
+        } else {
+          speak('Ocurrió un error al enviar el mensaje. Puedes intentarlo nuevamente');
+        }
+      },
+      'se envió el mensaje': () => {
+        if (!alert.show) {
+          speak('No hay resultados todavía');
+          return;
+        }
+        if (alert.type === 'success') {
+          speak('Sí, tu mensaje fue enviado exitosamente');
+        } else {
+          speak('No, ocurrió un error. Puedes intentar enviarlo de nuevo');
+        }
+      },
+
+      // OTRAS ACCIONES
       'limpiar formulario': () => {
         setNombre('');
         setEmail('');
         setMensaje('');
+        setAlert({ show: false, type: '', message: '' });
         speak('Formulario limpiado');
+      },
+      'qué campos faltan': () => {
+        const faltantes = [];
+        if (!nombre) faltantes.push('nombre');
+        if (!email) faltantes.push('correo electrónico');
+        if (!mensaje) faltantes.push('mensaje');
+
+        if (faltantes.length === 0) {
+          speak('Todos los campos están completos. Puedes enviar el mensaje');
+        } else {
+          speak(`Faltan los siguientes campos: ${faltantes.join(', ')}`);
+        }
       },
     };
 
@@ -81,7 +179,18 @@ const ContactUs = () => {
       console.log('[ContactUs] 🗑️ Comandos de voz eliminados');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nombre, email, mensaje, loading, speak]);
+  }, [nombre, email, mensaje, loading, alert, speak]);
+
+  // Efecto para leer automáticamente el resultado del envío
+  useEffect(() => {
+    if (alert.show) {
+      if (alert.type === 'success') {
+        speak('Tu mensaje fue enviado correctamente');
+      } else {
+        speak('Ocurrió un error al enviar el mensaje. Puedes intentarlo nuevamente más tarde');
+      }
+    }
+  }, [alert.show, alert.type, speak]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

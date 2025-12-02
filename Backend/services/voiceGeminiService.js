@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import { executeMCPPlan } from './mcpOrchestratorService.js';
-import { addUserMessage, addModelResponse } from './conversationHistoryService.js';
+import { addUserMessage, addModelResponse, getHistory } from './conversationHistoryService.js';
 import { parseToonResponse, formatToonSchema as formatToolsForToon } from '../utils/toonParser.js';
 
 dotenv.config();
@@ -91,6 +91,14 @@ const MCP_TOOLS_SCHEMA = [
                     description: 'Número máximo de productos a retornar (default: 10)'
                 }
             }
+        }
+    },
+    {
+        name: 'clearFilters',
+        description: 'Limpia todos los filtros activos (categoría, precio, búsqueda)',
+        parameters: {
+            type: 'OBJECT',
+            properties: {}
         }
     },
     {
@@ -455,10 +463,6 @@ const MCP_TOOLS_SCHEMA = [
 /**
  * Interpreta un comando de voz usando Gemini como cerebro
  * Gemini decide qué herramientas MCP usar y en qué orden
- *
- * @param {string} transcript - Texto del comando de voz
- * @param {Object} context - Contexto actual (usuario, URL, carrito, etc)
- * @returns {Object} Resultado con plan ejecutado y feedback
  */
 export async function interpretVoiceWithGemini(transcript, context = {}) {
     try {
@@ -495,6 +499,46 @@ REGLAS:
 7. Sé amable, conciso y proactivo.
 8. Si el usuario es ADMIN y quiere actualizar un pedido, usa 'updateOrderStatus'.
 9. Si el usuario es ADMIN y quiere actualizar un producto, usa 'updateProduct'.
+
+⚠️ REGLA CRÍTICA DE NAVEGACIÓN:
+Si el usuario quiere BUSCAR productos, FILTRAR categorías o AGREGAR productos, y la URL actual (ver CONTEXTO) NO es '/carta' ni '/', DEBES navegar primero a la carta.
+Ejemplo: TOOL: navigate | url: /carta
+
+⚠️ MANEJO DE "OTROS" PRODUCTOS:
+Si el usuario pide "otros", "más opciones" o "algo diferente" y YA se mostró una categoría:
+1. NO vuelvas a filtrar por la misma categoría (eso mostrará lo mismo).
+2. Intenta usar 'search' con un término relacionado pero diferente.
+3. O sugiere verbalmente otra categoría relacionada en el FEEDBACK sin ejecutar herramientas repetitivas.
+
+🔍 FILTRADO POR CATEGORÍA:
+Cuando el usuario pida ver productos de una categoría:
+1. PRIMERO: Usa 'clearFilters'
+2. SEGUNDO: Usa 'filterByCategory' con la categoría
+3. El feedback se generará automáticamente
+
+Si pide MÚLTIPLES categorías (ej: "panes y tortas"):
+- CASO 1 (Solo ver/explorar): Procesa UNA a la vez y pregunta por la siguiente.
+- CASO 2 (Comprar/Acción explícita): Si el usuario pide "comprar X y Y" o "agregar X y Y", PUEDES procesar ambas en secuencia (limpiar -> filtrar X -> agregar -> limpiar -> filtrar Y -> agregar).
+
+⚠️ MAPPING DE CATEGORÍAS (USAR EXACTAMENTE ESTOS NOMBRES):
+- "sandwich", "sandwiches", "sándwiches", "hamburguesas" -> Categoría: "Sanguches"
+- "bebida", "refresco", "gaseosa", "jugo" -> Categoría: "Bebidas"
+- "pan", "panes" -> Categoría: "Panes"
+- "torta", "tortas", "keke" -> Categoría: "Tortas"
+- "postre", "dulce" -> Categoría: "Postres"
+- "salado", "empanada" -> Categoría: "Salados"
+
+🗣️ RESPUESTAS DE VOZ (CRÍTICO):
+1. El FEEDBACK será leído por un motor TTS. EVITA listas con viñetas (*) o guiones (-).
+2. Usa oraciones completas y fluidas.
+   - MAL: "* Torta A: S/10 * Torta B: S/20"
+   - BIEN: "La Torta A cuesta 10 soles y la Torta B 20 soles."
+3. Si hay muchos productos, menciona solo los 2 o 3 más relevantes o resume el rango de precios.
+
+💰 CONSULTAS DE PRECIO:
+1. Si el usuario pregunta precios ("cuánto cuesta") sobre productos específicos mencionados antes, responde SOLO sobre esos productos.
+2. Si NO tienes los precios exactos en el contexto, USA 'search' o 'getProducts' para obtenerlos. NO inventes precios.
+
 
 CONTEXTO ACTUAL:
 ${JSON.stringify(context, null, 2)}
@@ -539,36 +583,56 @@ ${JSON.stringify(context, null, 2)}
             executionResult = await executeMCPPlan(parsedResponse.steps, context);
         }
 
-        // 5. RE-ACT: Generar nuevo feedback si hay resultados de datos (Búsqueda/Filtro)
-        // Si la herramienta devolvió productos, actualizamos el feedback para ser específicos
-        const dataStep = executionResult.results?.find(r =>
-            (r.tool === 'search' || r.tool === 'filterByCategory' || r.tool === 'getProducts' || r.tool === 'searchProducts') &&
-            r.success &&
-            (r.result.products || r.result.productsFound !== undefined)
-        );
-
+        // 5. RE-ACT: Generar nuevo feedback basado en la ejecución REAL
         let finalFeedback = parsedResponse.userFeedback;
 
-        if (dataStep) {
-            console.log('[Voice Gemini] Detectados resultados de datos, regenerando feedback...');
+        if (executionResult.results && executionResult.results.length > 0) {
+            console.log('[Voice Gemini] Resultados de ejecución detectados, regenerando feedback...');
 
-            const productsFound = dataStep.result.products || [];
-            const count = dataStep.result.productsFound || productsFound.length;
+            // Construir resumen de lo que pasó
+            const executionSummary = executionResult.results.map(r => {
+                if (r.tool === 'addToCart') {
+                    return r.success
+                        ? `✅ Producto agregado al carrito: ${r.params.productName} (cantidad: ${r.params.quantity || 1})`
+                        : `❌ Error al agregar ${r.params.productName}`;
+                }
+                if (r.tool === 'search' || r.tool === 'filterByCategory' || r.tool === 'getProducts') {
+                    const count = r.result?.productsFound || r.result?.products?.length || 0;
+                    const products = r.result?.products?.map(p => p.nombre).join(', ') || '';
+                    return `🔍 Búsqueda (${r.tool}): ${count} productos encontrados: ${products}`;
+                }
+                if (r.tool === 'getCartState') {
+                    const items = r.result?.items?.map(i => `${i.quantity}x ${i.name}`).join(', ') || 'Carrito vacío';
+                    const total = r.result?.total || 0;
+                    return `🛒 Estado del Carrito: ${r.result?.itemCount || 0} productos (Total: S/${total}). Items: ${items}`;
+                }
+                if (r.tool === 'clearFilters') {
+                    return `🧹 Filtros limpiados correctamente`;
+                }
+                return `🔧 Herramienta ${r.tool}: ${r.success ? 'Ejecutada correctamente' : 'Falló'}`;
+            }).join('\n');
 
-            // Generar feedback enriquecido
+            // Obtener historial reciente
+            const history = getHistory(context.user?.id);
+            const historyText = history.slice(-6).map(msg => `${msg.role === 'user' ? 'Usuario' : 'Asistente'}: ${msg.parts[0].text}`).join('\n');
+
             const feedbackPrompt = `
-CONTEXTO:
-El usuario dijo: "${transcript}"
-El asistente ejecutó la herramienta: "${dataStep.tool}"
-Resultado: Se encontraron ${count} productos.
-Lista de productos (primeros 5): ${JSON.stringify(productsFound.slice(0, 5).map(p => p.nombre || p.name), null, 2)}
+CONTEXTO DE CONVERSACIÓN PREVIA:
+${historyText}
+
+EL USUARIO DIJO AHORA: "${transcript}"
+
+ACCIONES EJECUTADAS POR EL SISTEMA:
+${executionSummary}
 
 TAREA:
-Genera una respuesta verbal breve y natural para el usuario.
-- Si hay productos, menciona cuántos hay y lista los 2-3 más relevantes.
-- Si no hay productos, dilo claramente y ofrece ayuda.
-- NO uses formato JSON ni markdown, solo el texto plano de lo que dirías.
-- Sé amable y entusiasta.
+Genera una respuesta verbal breve, natural y persuasiva (estilo vendedor amable).
+- Si el usuario pidió algo específico (ej: "jugos"), menciona el contexto (ej: "Para refrescarte, aquí tienes nuestras bebidas...").
+- Confirma las acciones exitosas con entusiasmo.
+- Si hubo búsquedas con resultados, destaca algunos nombres apetitosos.
+- Si NO hubo resultados, ofrece una alternativa relacionada o pregunta si quiere ver otra cosa.
+- NO menciones pasos técnicos.
+- Sé cálido, como un mesero experto en un restaurante italiano familiar.
 `;
 
             const feedbackModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
