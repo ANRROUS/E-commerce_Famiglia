@@ -105,6 +105,9 @@ function Layout() {
     if (publicRoutes.includes(location.pathname)) {
       localStorage.setItem("lastSafePath", location.pathname);
     }
+
+    // Scroll to top on route change
+    window.scrollTo(0, 0);
   }, [location.pathname]);
 
   return (

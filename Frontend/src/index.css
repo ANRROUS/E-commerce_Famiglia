@@ -11,8 +11,11 @@
 
 body {
   @apply leading-[normal] m-0;
+  background-color: white;
 }
+
 @layer base {
+
   *,
   *::before,
   *::after {
@@ -25,17 +28,23 @@ body {
 }
 
 .scrollbar-hide {
-  -ms-overflow-style: none; /* IE y Edge */
-  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+  /* IE y Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 /* Oculta la barra de scroll en todos los navegadores, pero mantiene el scroll funcional */
-html, body {
-  scrollbar-width: none;      /* Firefox */
-  -ms-overflow-style: none;   /* IE y Edge antiguos */
+html,
+body {
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE y Edge antiguos */
 }
 
-html::-webkit-scrollbar, 
+html::-webkit-scrollbar,
 body::-webkit-scrollbar {
-  display: none;              /* Chrome, Safari, Opera */
+  display: none;
+  /* Chrome, Safari, Opera */
 }

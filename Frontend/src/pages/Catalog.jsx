@@ -2,17 +2,22 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Box,
   Typography,
-  CircularProgress,
   Button,
-  useMediaQuery,
-  useTheme,
-  Chip,
+  Grid,
+  CircularProgress,
   IconButton,
+  InputAdornment,
+  Drawer,
   Pagination,
+  Chip,
+  Backdrop,
+  useTheme,
+  useMediaQuery
 } from "@mui/material";
-import Drawer from "@mui/material/Drawer";
 import MenuIcon from "@mui/icons-material/Menu";
 import SearchIcon from "@mui/icons-material/Search";
+import GridViewIcon from '@mui/icons-material/GridView';
+import ViewListIcon from '@mui/icons-material/ViewList';
 import { ProductosAPI, categoriaAPI } from "../services/api";
 import { useDispatch } from "react-redux";
 import { addToCartAsync } from "../redux/slices/cartSlice";
@@ -20,7 +25,8 @@ import NotificationSnackbar from "../components/common/NotificationSnackbar";
 import BuscadorProductos from "../components/common/BuscadorProductos";
 import FiltroPrecio from "../components/common/FiltroPrecio";
 import ProductCard from "../components/common/ProductCard";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import Modal from "../components/common/Modal";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -39,10 +45,14 @@ export default function Catalog() {
   const [selectedCategories, setSelectedCategories] = useState([]); // array of ids
   const [searchTerm, setSearchTerm] = useState("");
   const [priceRange, setPriceRange] = useState([0, 100]);
+
   const [priceBounds, setPriceBounds] = useState([0, 100]);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'grid'
 
   // UI
   const [notification, setNotification] = useState({ open: false, message: "" });
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   // pagination
   const [page, setPage] = useState(1);
@@ -154,17 +164,28 @@ export default function Catalog() {
     setPage(1);
   }, [priceBounds]);
 
+  const [isAdding, setIsAdding] = useState(false);
+
+  // ... (existing useEffects)
+
   const handleAddToCart = useCallback(
     (product) => {
+      setIsAdding(true);
       dispatch(addToCartAsync(product))
         .unwrap()
-        .then(() => setNotification({ open: true, message: "Producto agregado al carrito" }))
+        .then(() => {
+          setNotification({
+            open: true,
+            message: "¡Producto agregado al carrito!",
+          });
+        })
         .catch((err) =>
           setNotification({
             open: true,
             message: (err && err.error) || "Error al agregar al carrito",
           })
-        );
+        )
+        .finally(() => setIsAdding(false));
     },
     [dispatch]
   );
@@ -179,6 +200,17 @@ export default function Catalog() {
 
   return (
     <Box className="w-full min-h-screen bg-[#FFFFFF] font-['Montserrat']" sx={{ py: { xs: 4, md: 8 }, px: { xs: 3, sm: 6, md: 10, lg: 16 } }}>
+      {/* Loading Overlay for Add to Cart */}
+      <Backdrop
+        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1, flexDirection: 'column', gap: 2 }}
+        open={isAdding}
+      >
+        <CircularProgress color="inherit" />
+        <Typography variant="h6" sx={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600 }}>
+          Agregando al carrito...
+        </Typography>
+      </Backdrop>
+
       <Box className="max-w-7xl mx-auto" sx={{ display: "flex", gap: { xs: 2, md: 8 }, flexDirection: { xs: "column", md: "row" } }}>
         {/* SIDEBAR */}
         {isMobile ? (
@@ -244,8 +276,8 @@ export default function Catalog() {
                 <Typography
                   sx={{
                     color: "#F29D4C",
-                    fontWeight: 400,
-                    fontFamily: "'Lilita One', sans-serif",
+                    fontWeight: 700,
+                    fontFamily: "'Montserrat', sans-serif",
                     fontSize: "1.5rem",
                     mb: 2,
                   }}
@@ -270,8 +302,9 @@ export default function Catalog() {
                         borderRadius: "999px",
                         px: 2,
                         py: 0.5,
-                        fontFamily: "'Lilita One', sans-serif",
-                        fontSize: "1.1rem",
+                        fontFamily: "'Montserrat', sans-serif",
+                        fontWeight: 600,
+                        fontSize: "0.95rem",
                         "&:hover": {
                           backgroundColor: selectedCategories.includes(String(cat.id_categoria))
                             ? "#8b3e3e"
@@ -330,134 +363,166 @@ export default function Catalog() {
               display: { xs: "none", md: "block" },
             }}
           >
-            {/* SIDEBAR */}
-            <Box sx={{ width: 260, position: "sticky", top: "1rem", height: "fit-content", display: { xs: "none", md: "block" } }}>
-              <Box sx={{ mb: 4 }}>
-                <Typography
-                  sx={{
-                    color: "#F29D4C",
-                    fontWeight: 400,
-                    fontFamily: "'Lilita One', sans-serif",
-                    fontSize: "1.5rem", // Título grande
-                  }}
-                >
-                  Categorías
-                </Typography>
-              </Box>
+            <Box sx={{ mb: 4 }}>
+              <Typography
+                sx={{
+                  color: "#F29D4C",
+                  fontWeight: 700,
+                  fontFamily: "'Montserrat', sans-serif",
+                  fontSize: "1.5rem",
+                }}
+              >
+                Categorías
+              </Typography>
+            </Box>
 
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 4 }}>
-                {categorias.map((cat) => (
-                  <Button
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 4 }}>
+              {categorias.map((cat) => {
+                const isSelected = selectedCategories.includes(String(cat.id_categoria));
+                return (
+                  <div
                     key={cat.id_categoria}
                     onClick={() => toggleCategory(cat.id_categoria)}
-                    variant="text"
-                    sx={{
-                      justifyContent: "flex-start",
-                      textTransform: "none",
-                      color: selectedCategories.includes(String(cat.id_categoria)) ? "#fff" : "#8b3e3e",
-                      backgroundColor: selectedCategories.includes(String(cat.id_categoria)) ? "#8b3e3e" : "transparent",
-                      borderRadius: "999px",
-                      px: 2,
-                      py: 0.5,
-                      fontFamily: "'Lilita One', sans-serif",
-                      fontSize: "1.1rem",
-                      "&:hover": {
-                        backgroundColor: selectedCategories.includes(String(cat.id_categoria))
-                          ? "#8b3e3e"
-                          : "#EACCCC",
-                      },
-                    }}
+                    className={`
+                      cursor-pointer px-4 py-3 text-sm font-semibold transition-all duration-300 flex items-center justify-between group
+                      ${isSelected
+                        ? 'border-l-4 border-[#8b3e3e] bg-gradient-to-r from-[#fff0f0] to-white text-[#8b3e3e] rounded-r-lg shadow-sm'
+                        : 'border-l-4 border-transparent text-gray-500 hover:text-[#8b3e3e] hover:bg-gray-50 rounded-lg'}
+                    `}
                   >
-                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          border: "2px solid #8b3e3e",
-                          display: "inline-block",
-                          marginRight: 8,
-                          opacity: selectedCategories.includes(String(cat.id_categoria)) ? 1 : 0.5,
-                        }}
-                      />
-                      {cat.nombre}
-                    </span>
-                  </Button>
-                ))}
-              </Box>
+                    <span className="font-['Montserrat']">{cat.nombre}</span>
+                    {isSelected && <span className="w-2 h-2 rounded-full bg-[#8b3e3e]"></span>}
+                  </div>
+                );
+              })}
+            </Box>
 
-              <Box sx={{ mt: 3 }}>
-                <Typography
-                  sx={{
-                    color: "#F29D4C",
-                    fontWeight: 400,
-                    fontFamily: "'Lilita One', sans-serif",
-                    fontSize: "1.5rem",
+            <Box sx={{ mt: 3 }}>
+              <Typography
+                sx={{
+                  color: "#F29D4C",
+                  fontWeight: 700,
+                  fontFamily: "'Montserrat', sans-serif",
+                  fontSize: "1.5rem",
+                }}
+              >
+                Precios
+              </Typography>
+              <Box sx={{ mt: 2, px: 1 }}>
+                <FiltroPrecio
+                  min={priceBounds[0]}
+                  max={priceBounds[1]}
+                  value={priceRange}
+                  onChange={(v) => {
+                    setPriceRange(v);
+                    setPage(1);
                   }}
-                >
-                  Precios
-                </Typography>
-                <Box sx={{ mt: 2 }}>
-                  <FiltroPrecio
-                    min={priceBounds[0]}
-                    max={priceBounds[1]}
-                    value={priceRange}
-                    onChange={(v) => {
-                      setPriceRange(v);
-                      setPage(1);
-                    }}
-                  />
-                  <Typography variant="caption" sx={{ color: "#8b3e3e", display: "block", mt: 1, fontSize: "0.8rem", }}>
-                    Precio: S/{priceRange[0]} - S/{priceRange[1]}
-                  </Typography>
-                </Box>
+                />
               </Box>
             </Box>
           </Box>
         )}
 
-
         {/* MAIN */}
         <Box sx={{ flex: 1 }}>
           {/* Header with search */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
-            <Typography
-              variant="h4"
-              data-aos="fade-down"
-              sx={{
-                fontWeight: 700,
-                color: '#8b3e3e',
-                fontSize: { xs: '1.75rem', md: '2rem' },
-              }}
-            >
-              Nuestro Catálogo
-            </Typography>
-            <Box sx={{ width: { xs: '100%', sm: 400 } }} data-aos="fade-left">
-              <BuscadorProductos value={searchTerm} onChange={(v) => { setSearchTerm(v); setPage(1); }} placeholder="Buscar por nombre o descripción" />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ width: { xs: '100%', sm: 450 }, display: 'flex', gap: 2, alignItems: 'center' }} data-aos="fade-left">
+              <Box sx={{ flex: 1 }}>
+                <BuscadorProductos value={searchTerm} onChange={(v) => { setSearchTerm(v); setPage(1); }} placeholder="Buscar por nombre o descripción" />
+              </Box>
+
+              {/* View Toggle Buttons */}
+              <Box sx={{ display: { xs: 'none', md: 'flex' }, backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0', overflow: 'hidden', flexShrink: 0 }}>
+                <IconButton
+                  onClick={() => setViewMode('list')}
+                  sx={{
+                    borderRadius: 0,
+                    color: viewMode === 'list' ? '#8b3e3e' : '#999',
+                    backgroundColor: viewMode === 'list' ? '#fff0f0' : 'transparent',
+                    '&:hover': { backgroundColor: '#fff0f0' }
+                  }}
+                >
+                  <ViewListIcon />
+                </IconButton>
+                <IconButton
+                  onClick={() => setViewMode('grid')}
+                  sx={{
+                    borderRadius: 0,
+                    color: viewMode === 'grid' ? '#8b3e3e' : '#999',
+                    backgroundColor: viewMode === 'grid' ? '#fff0f0' : 'transparent',
+                    '&:hover': { backgroundColor: '#fff0f0' }
+                  }}
+                >
+                  <GridViewIcon />
+                </IconButton>
+              </Box>
             </Box>
           </Box>
 
           {/* Filters header only if there are selected categories */}
           {selectedCategories.length > 0 && (
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", mb: 3, gap: 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", mb: 4, gap: 2, p: 2, backgroundColor: "#fafafa", borderRadius: "12px", border: "1px dashed #e0e0e0" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Typography sx={{
-                  color: "#c62828",
-                  fontWeight: 400,
-                  fontFamily: "'Lilita One', sans-serif",
-                  fontSize: "1.3rem",
-                }}>Filtros:</Typography>
-                {/* show clear filters button */}
-                <IconButton size="small" onClick={handleClearFilters} aria-label="limpiar-filtros">
-                  ✕
-                </IconButton>
+                  color: "#4a2b2b",
+                  fontWeight: 700,
+                  fontFamily: "'Montserrat', sans-serif",
+                  fontSize: "0.95rem",
+                }}>Filtros activos:</Typography>
+                <Button
+                  size="small"
+                  onClick={handleClearFilters}
+                  sx={{
+                    color: "#999",
+                    borderRadius: 0,
+                    textTransform: "none",
+                    minWidth: "auto",
+                    padding: "2px 8px",
+                    "&:hover": { color: "#d32f2f", backgroundColor: "transparent", textDecoration: "underline" }
+                  }}
+                  title="Limpiar todos"
+                >
+                  <span className="text-xs font-bold">Borrar todo</span>
+                </Button>
               </Box>
 
-              <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                {/* tags for selected categories */}
+              <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
                 {selectedCategories.map((sc) => {
                   const cat = categorias.find((c) => String(c.id_categoria) === String(sc));
-                  return cat ? <Chip key={sc} label={cat.nombre} size="small" sx={{ backgroundColor: "#fff0f0", color: "#8b3e3e", border: "1px solid #f4cfcf" }} /> : null;
+                  return cat ? (
+                    <Chip
+                      key={sc}
+                      label={cat.nombre}
+                      onDelete={() => toggleCategory(sc)}
+                      deleteIcon={
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', paddingRight: '4px' }}>
+                          <span style={{ fontSize: '16px', fontWeight: 'bold', lineHeight: 1 }}>×</span>
+                        </div>
+                      }
+                      sx={{
+                        backgroundColor: "#fff",
+                        color: "#8b3e3e",
+                        border: "1px solid #eecbcb",
+                        fontFamily: "'Montserrat', sans-serif",
+                        fontWeight: 600,
+                        fontSize: "0.85rem",
+                        height: "32px",
+                        "& .MuiChip-label": {
+                          paddingRight: '8px',
+                        },
+                        "& .MuiChip-deleteIcon": {
+                          color: "#eecbcb",
+                          margin: 0,
+                          "&:hover": { color: "#d32f2f" }
+                        },
+                        "&:hover": {
+                          backgroundColor: "#fff0f0",
+                          borderColor: "#d32f2f"
+                        }
+                      }}
+                    />
+                  ) : null;
                 })}
               </Box>
             </Box>
@@ -468,9 +533,15 @@ export default function Catalog() {
             <Typography className="text-center text-gray-500 mt-12">No hay productos disponibles con esos filtros.</Typography>
           ) : (
             <Box>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: viewMode === 'grid'
+                  ? 'repeat(auto-fill, minmax(220px, 1fr))'
+                  : { xs: '1fr', md: '1fr 1fr' },
+                gap: 2
+              }}>
                 {currentPageProducts.map((p, index) => (
-                  <div key={p.id} data-aos="fade-up" data-aos-delay={index * 50}>
+                  <div key={p.id}>
                     <ProductCard
                       product={{
                         id_producto: p.id,
@@ -481,6 +552,7 @@ export default function Catalog() {
                         totalVendido: p.totalVendido || 0,
                       }}
                       onAddToCart={handleAddToCart}
+                      layout={viewMode}
                     />
                   </div>
                 ))}
@@ -530,12 +602,13 @@ export default function Catalog() {
                   }}
                 />
               </Box>
-            </Box>
-          )}
-        </Box>
-      </Box>
+            </Box >
+          )
+          }
+        </Box >
+      </Box >
 
       <NotificationSnackbar open={notification.open} message={notification.message} onClose={() => setNotification({ ...notification, open: false })} />
-    </Box>
+    </Box >
   );
 }

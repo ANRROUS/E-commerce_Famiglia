@@ -145,32 +145,36 @@ const Header = () => {
   };
 
   return (
-    <Box className="w-full bg-white text-[#6b2c2c] font-[Montserrat] border-b-[1.5px] border-[#b17b6b] relative">
-      <Box className="max-w-7xl mx-auto flex items-center justify-between px-8">
+    <Box
+      className={`w-full font-[Montserrat] border-b border-[#eecbcb] transition-all duration-300 ${location.pathname === "/" ? "bg-white" : "sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-sm"
+        }`}
+    >
+      <Box className="max-w-[1400px] mx-auto flex items-center justify-between px-6 py-2 md:px-12">
         {/* Logo */}
         <img
           src={imgLogoFamiglia}
           alt="Panadería Famiglia"
-          className="w-36 sm:w-44 md:w-48 object-contain cursor-pointer"
+          className="w-24 sm:w-28 md:w-32 object-contain cursor-pointer transition-transform hover:scale-105"
           onClick={() => handleNavigation("/")}
         />
 
         {/* 🔹 Menú de escritorio */}
         {!isMobile ? (
           <>
-            <Box className="flex items-center gap-10 text-sm font-medium relative">
+            <Box className="flex items-center gap-8 text-[14px] font-medium relative tracking-wide">
               {navLinks.map(({ label, path, ref }) => (
                 <span
                   key={path}
                   ref={ref}
                   onClick={() => handleNavigation(path)}
-                  className="cursor-pointer hover:text-[#9c4c4c]"
+                  className={`cursor-pointer transition-colors duration-300 ${location.pathname === path ? "text-[#8b3e3e] font-semibold" : "text-[#6b2c2c] hover:text-[#9c4c4c]"
+                    }`}
                 >
                   {label}
                 </span>
               ))}
               <Box
-                className="absolute bottom-[-4px] h-[2px] bg-[#6b2c2c] transition-all duration-300 ease-in-out"
+                className="absolute bottom-[-6px] h-[2px] bg-[#8b3e3e] transition-all duration-300 ease-out rounded-full"
                 style={{
                   width: underlineStyle.width,
                   left: underlineStyle.left,
@@ -178,27 +182,36 @@ const Header = () => {
               />
             </Box>
 
-            <Box className="flex gap-3 items-center">
+            <Box className="flex gap-4 items-center">
               {isAuthenticated ? (
                 <>
-                  <IconButton onClick={() => handleNavigation("/cart")} sx={{ color: "#8b3e3e", position: "relative" }}>
-                    <ShoppingCartIcon />
+                  <IconButton
+                    onClick={() => handleNavigation("/cart")}
+                    sx={{
+                      color: "#8b3e3e",
+                      position: "relative",
+                      transition: "transform 0.2s",
+                      "&:hover": { transform: "scale(1.1)" }
+                    }}
+                  >
+                    <ShoppingCartIcon fontSize="small" />
                     {totalQuantity > 0 && (
                       <Box
                         sx={{
                           position: "absolute",
-                          top: 4,
-                          right: 4,
+                          top: -2,
+                          right: -2,
                           backgroundColor: "#e74c3c",
                           color: "white",
                           borderRadius: "50%",
-                          width: 18,
-                          height: 18,
+                          width: 16,
+                          height: 16,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           fontSize: 10,
                           fontWeight: "bold",
+                          boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
                         }}
                       >
                         {totalQuantity}
@@ -206,23 +219,48 @@ const Header = () => {
                     )}
                   </IconButton>
 
-                  <IconButton onClick={() => handleNavigation("/profile")} sx={{ color: "#8b3e3e" }}>
-                    <AccountCircleIcon />
-                  </IconButton>
+                  {/* Divider */}
+                  <div className="h-5 w-[1px] bg-[#eecbcb]"></div>
 
-                  <span className="text-sm font-medium text-[#8b3e3e]">{user?.nombre}</span>
+                  <Box
+                    className="flex items-center gap-2 cursor-pointer hover:bg-[#fff0f0] px-2 py-1 rounded-full transition-colors"
+                    onClick={() => handleNavigation("/profile")}
+                  >
+                    <AccountCircleIcon sx={{ color: "#8b3e3e", fontSize: 22 }} />
+                    <span className="text-sm font-semibold text-[#8b3e3e] max-w-[100px] truncate">{user?.nombre}</span>
+                  </Box>
 
-                  <Button onClick={handleLogout} variant="outlined" sx={buttonStyles.outlined}>
-                    Cerrar Sesión
+                  <Button
+                    onClick={handleLogout}
+                    variant="outlined"
+                    size="small"
+                    sx={{
+                      borderColor: "#8b3e3e",
+                      color: "#8b3e3e",
+                      fontWeight: 600,
+                      textTransform: "none",
+                      borderRadius: "6px",
+                      px: 2,
+                      py: 0.2,
+                      fontSize: '0.8rem',
+                      minWidth: 'auto',
+                      "&:hover": {
+                        backgroundColor: "#8b3e3e",
+                        color: "#fff",
+                        borderColor: "#8b3e3e",
+                      },
+                    }}
+                  >
+                    Salir
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button onClick={() => setShowRegister(true)} variant="contained" sx={buttonStyles.contained}>
+                  <Button onClick={() => setShowRegister(true)} variant="contained" size="small" sx={{ ...buttonStyles.contained, py: 0.5, fontSize: '0.85rem' }}>
                     Registrarse
                   </Button>
-                  <Button onClick={() => showLoginModal()} variant="outlined" sx={buttonStyles.outlined}>
-                    Iniciar Sesión
+                  <Button onClick={() => showLoginModal()} variant="outlined" size="small" sx={{ ...buttonStyles.outlined, py: 0.5, fontSize: '0.85rem' }}>
+                    Ingresar
                   </Button>
                 </>
               )}
@@ -230,7 +268,7 @@ const Header = () => {
           </>
         ) : (
           // 🔹 Botón de menú móvil
-          <IconButton onClick={() => setMenuOpen(!menuOpen)}>
+          <IconButton onClick={() => setMenuOpen(!menuOpen)} sx={{ color: "#8b3e3e" }}>
             {menuOpen ? <CloseIcon /> : <MenuIcon />}
           </IconButton>
         )}
@@ -238,24 +276,24 @@ const Header = () => {
 
       {/* 🔹 Menú móvil desplegable */}
       {isMobile && menuOpen && (
-        <Box className="flex flex-col items-center bg-white text-[#6b2c2c] py-6 gap-5 border-t border-[#c9a6a6]">
+        <Box className="flex flex-col items-center bg-white text-[#6b2c2c] py-8 gap-6 border-t border-[#f0dada] shadow-lg absolute w-full left-0 top-full z-40">
           {navLinks.map(({ label, path }) => (
             <span
               key={path}
-              onClick={() => handleNavigation(path)}
-              className="cursor-pointer hover:text-[#9c4c4c]"
+              onClick={() => { handleNavigation(path); setMenuOpen(false); }}
+              className="cursor-pointer text-lg font-medium hover:text-[#8b3e3e] transition-colors"
             >
               {label}
             </span>
           ))}
 
-          <Box className="flex flex-col gap-3 mt-4 w-[60%]">
+          <Box className="flex flex-col gap-4 mt-4 w-[80%] max-w-xs">
             {isAuthenticated ? (
               <>
-                <Button onClick={() => handleNavigation("/cart")} variant="contained" sx={buttonStyles.contained}>
+                <Button onClick={() => { handleNavigation("/cart"); setMenuOpen(false); }} variant="contained" sx={buttonStyles.contained}>
                   Carrito ({totalQuantity})
                 </Button>
-                <Button onClick={() => handleNavigation("/profile")} variant="outlined" sx={buttonStyles.outlined}>
+                <Button onClick={() => { handleNavigation("/profile"); setMenuOpen(false); }} variant="outlined" sx={buttonStyles.outlined}>
                   Perfil
                 </Button>
                 <Button onClick={handleLogout} variant="outlined" sx={buttonStyles.outlined}>

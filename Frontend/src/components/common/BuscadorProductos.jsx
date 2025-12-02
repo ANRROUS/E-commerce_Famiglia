@@ -30,6 +30,14 @@ const BuscadorProductos = ({ value, onChange, placeholder = 'Buscar productos...
         '& .MuiOutlinedInput-root': {
           borderRadius: '999px',
           backgroundColor: '#fff',
+          transition: 'all 0.3s ease',
+          '&:hover fieldset': {
+            borderColor: '#8b3e3e',
+          },
+          '&.Mui-focused fieldset': {
+            borderColor: '#8b3e3e',
+            borderWidth: '2px',
+          },
         },
       }}
     />

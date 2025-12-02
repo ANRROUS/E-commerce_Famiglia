@@ -20,7 +20,7 @@ const FiltroPrecio = ({ min = 0, max = 100, value = [0, 100], onChange }) => {
         valueLabelDisplay="off"
         min={min}
         max={max}
-        sx={{ color: '#8b3e3e' }}
+        sx={{ color: '#d32f2f' }}
       />
     </Box>
   );
