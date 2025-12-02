@@ -44,11 +44,13 @@ const authSlice = createSlice({
       state.error = action.payload;
     },
     logout: (state) => {
+      // Reiniciar completamente el estado de autenticación
       state.user = null;
       state.role = null;
       state.isAuthenticated = false;
       state.token = null;
       state.error = null;
+      state.isLoading = false;
     },
     clearError: (state) => {
       state.error = null;

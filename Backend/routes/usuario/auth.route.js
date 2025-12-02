@@ -10,7 +10,7 @@ const router = express.Router();
 
 router.post("/register", validateSchema(registerSchema), register);
 router.post("/login", validateSchema(loginSchema), login);
-router.post("/logout", logout);
+router.post("/logout", verifyToken, logout);
 router.get("/perfil", verifyToken, getPerfil);
 router.post("/perfil/setup", verifyToken, setup2FA);
 router.post("/perfil/verify", verifyToken, verify2FA);

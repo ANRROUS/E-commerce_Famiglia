@@ -257,6 +257,14 @@ const TOOLS = [
     }
   },
   {
+    name: 'getVisibleProducts',
+    description: 'Obtiene la lista de productos actualmente visibles en la página después de aplicar filtros. Usar DESPUÉS de filterByCategory, filterByPrice o search para ver qué productos quedaron.',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
     name: 'sortBy',
     description: 'Ordena productos',
     inputSchema: {
@@ -751,6 +759,74 @@ const TOOLS = [
       },
       required: ['alias']
     }
+  },
+  // PREFERENCE TEST TOOLS
+  {
+    name: 'getTestState',
+    description: 'Obtiene el estado actual del test de preferencias, incluyendo respuestas seleccionadas',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'selectTestAnswer',
+    description: 'Selecciona una respuesta para la pregunta actual del test',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        answer: {
+          type: 'string',
+          description: 'Respuesta seleccionada (debe coincidir con una opción)'
+        }
+      },
+      required: ['answer']
+    }
+  },
+  {
+    name: 'nextTestQuestion',
+    description: 'Avanza a la siguiente pregunta del test',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'previousTestQuestion',
+    description: 'Retrocede a la pregunta anterior del test (muestra la respuesta previamente seleccionada)',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'startTest',
+    description: 'Inicia el test de preferencias',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        userPrompt: {
+          type: 'string',
+          description: 'Preferencias iniciales del usuario (opcional)'
+        }
+      }
+    }
+  },
+  {
+    name: 'finalizeTest',
+    description: 'Finaliza el test y genera la recomendación (usar en la última pregunta)',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'getTestRecommendation',
+    description: 'Obtiene la recomendación final con nombre, precio y razón',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
   }
 ];
 
@@ -1129,14 +1205,14 @@ const toolHandlers = {
     }
   },
 
-  async filterByPrice({ minPrice, maxPrice }) {
+  async filterByPrice({ minPrice, maxPrice, min, max }) {
     const p = await initBrowser();
 
-    // Usar minPrice y maxPrice en lugar de min y max
-    const min = minPrice !== undefined ? minPrice : 0;
-    const max = maxPrice !== undefined ? maxPrice : 100;
+    // Aceptar tanto min/max como minPrice/maxPrice
+    const minVal = min !== undefined ? min : (minPrice !== undefined ? minPrice : 0);
+    const maxVal = max !== undefined ? max : (maxPrice !== undefined ? maxPrice : 100);
 
-    console.error(`[MCP Playwright] Filtrando precios: ${min} - ${max} `);
+    console.error(`[MCP Playwright] Filtrando precios: ${minVal} - ${maxVal}`);
 
     // El slider de MUI es complejo, mejor usar evaluate para cambiar el state directamente
     try {
@@ -1179,8 +1255,8 @@ const toolHandlers = {
           }
         });
 
-        console.log(`[Price Filter] Valores establecidos: ${minVal} - ${maxVal} `);
-      }, [min, max]);
+        console.log(`[Price Filter] Valores establecidos: ${minVal} - ${maxVal}`);
+      }, [minVal, maxVal]);
 
       // Esperar a que se aplique el filtro
       await p.waitForTimeout(1000);
@@ -1189,12 +1265,48 @@ const toolHandlers = {
 
       return {
         success: true,
-        minPrice: min,
-        maxPrice: max,
+        minPrice: minVal,
+        maxPrice: maxVal,
         filtered: true
       };
     } catch (error) {
       console.error('[MCP Playwright] Error filtrando por precio:', error);
+      throw error;
+    }
+  },
+
+  async getVisibleProducts() {
+    const p = await initBrowser();
+    console.log('[getVisibleProducts] Obteniendo productos visibles...');
+
+    try {
+      const products = await p.evaluate(() => {
+        const productCards = document.querySelectorAll('[data-product-card]:not([style*="display: none"])');
+
+        if (productCards.length === 0) {
+          return [];
+        }
+
+        return Array.from(productCards).map(card => {
+          const nombre = card.querySelector('[data-product-name]')?.textContent?.trim() || 'Sin nombre';
+          const precioText = card.querySelector('[data-product-price]')?.textContent?.trim() || '0';
+          const precio = parseFloat(precioText.replace(/[^\d.]/g, ''));
+          const imagen = card.querySelector('[data-product-image]')?.src || '';
+          const id = card.getAttribute('data-product-id') || '';
+
+          return { id, nombre, precio, imagen };
+        });
+      });
+
+      console.log(`[getVisibleProducts] ✓ Encontrados ${products.length} productos visibles`);
+
+      return {
+        success: true,
+        count: products.length,
+        products: products
+      };
+    } catch (error) {
+      console.error('[getVisibleProducts] Error:', error);
       throw error;
     }
   },
@@ -3141,6 +3253,285 @@ const toolHandlers = {
     } else {
       throw new Error(`Error actualizando producto: ${result.error}`);
     }
+  },
+
+  // PREFERENCE TEST FLOW TOOLS
+  async getTestState() {
+    const p = await initBrowser();
+    console.log('[getTestState] Obteniendo estado del test de preferencias');
+
+    const testState = await p.evaluate(() => {
+      // Acceder al Redux store
+      const store = window.__REDUX_STORE__ || window.store;
+      if (!store) {
+        return { error: 'Redux store no disponible' };
+      }
+
+      const state = store.getState();
+      const preferencesState = state.preferences || {};
+
+      return {
+        hasActiveTest: preferencesState.questions && preferencesState.questions.length > 0,
+        currentQuestion: preferencesState.currentQuestion || 0,
+        totalQuestions: preferencesState.questions ? preferencesState.questions.length : 0,
+        question: preferencesState.questions && preferencesState.questions[preferencesState.currentQuestion]
+          ? preferencesState.questions[preferencesState.currentQuestion].question
+          : null,
+        options: preferencesState.questions && preferencesState.questions[preferencesState.currentQuestion]
+          ? preferencesState.questions[preferencesState.currentQuestion].options
+          : [],
+        answers: preferencesState.answers || {},
+        currentAnswer: preferencesState.answers && preferencesState.answers[preferencesState.currentQuestion]
+          ? preferencesState.answers[preferencesState.currentQuestion]
+          : null,
+        testCompleted: preferencesState.testCompleted || false,
+        recommendation: preferencesState.recommendation || null
+      };
+    });
+
+    if (testState.error) {
+      throw new Error(testState.error);
+    }
+
+    return {
+      success: true,
+      ...testState
+    };
+  },
+
+  async selectTestAnswer({ answer }) {
+    const p = await initBrowser();
+    console.log(`[selectTestAnswer] Seleccionando respuesta: ${answer}`);
+
+    const result = await p.evaluate((selectedAnswer) => {
+      const store = window.__REDUX_STORE__ || window.store;
+      if (!store) {
+        return { success: false, error: 'Redux store no disponible' };
+      }
+
+      try {
+        // Dispatch action to set answer
+        store.dispatch({
+          type: 'preferences/setAnswer',
+          payload: selectedAnswer
+        });
+
+        const state = store.getState();
+        const currentQuestion = state.preferences.currentQuestion;
+
+        return {
+          success: true,
+          currentQuestion,
+          answer: selectedAnswer
+        };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    }, answer);
+
+    if (!result.success) {
+      throw new Error(result.error || 'Error seleccionando respuesta');
+    }
+
+    return result;
+  },
+
+  async nextTestQuestion() {
+    const p = await initBrowser();
+    console.log('[nextTestQuestion] Avanzando a la siguiente pregunta');
+
+    const result = await p.evaluate(() => {
+      const store = window.__REDUX_STORE__ || window.store;
+      if (!store) {
+        return { success: false, error: 'Redux store no disponible' };
+      }
+
+      try {
+        store.dispatch({ type: 'preferences/nextQuestion' });
+
+        const state = store.getState();
+        const currentQuestion = state.preferences.currentQuestion;
+        const question = state.preferences.questions[currentQuestion];
+
+        return {
+          success: true,
+          currentQuestion,
+          question: question ? question.question : null,
+          options: question ? question.options : []
+        };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Error avanzando pregunta');
+    }
+
+    return result;
+  },
+
+  async previousTestQuestion() {
+    const p = await initBrowser();
+    console.log('[previousTestQuestion] Retrocediendo a la pregunta anterior');
+
+    const result = await p.evaluate(() => {
+      const store = window.__REDUX_STORE__ || window.store;
+      if (!store) {
+        return { success: false, error: 'Redux store no disponible' };
+      }
+
+      try {
+        store.dispatch({ type: 'preferences/previousQuestion' });
+
+        const state = store.getState();
+        const currentQuestion = state.preferences.currentQuestion;
+        const question = state.preferences.questions[currentQuestion];
+        const previousAnswer = state.preferences.answers[currentQuestion];
+
+        return {
+          success: true,
+          currentQuestion,
+          question: question ? question.question : null,
+          options: question ? question.options : [],
+          previousAnswer
+        };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Error retrocediendo pregunta');
+    }
+
+    return result;
+  },
+
+  async startTest({ userPrompt }) {
+    const p = await initBrowser();
+    console.log('[startTest] Iniciando test de preferencias con prompt:', userPrompt);
+
+    try {
+      // 1. Si hay prompt, escribirlo en el textarea
+      if (userPrompt) {
+        const textareaSelector = 'textarea[placeholder*="Me gustan los postres"], textarea';
+        if (await p.isVisible(textareaSelector)) {
+          await p.fill(textareaSelector, userPrompt);
+        }
+      }
+
+      // 2. Hacer clic en el botón "Comenzar Test"
+      const buttonSelector = 'button:has-text("Comenzar Test")';
+      if (await p.isVisible(buttonSelector)) {
+        await p.click(buttonSelector);
+        console.log('[startTest] Click en botón Comenzar Test');
+      } else {
+        console.warn('[startTest] Botón Comenzar Test no encontrado, intentando vía Redux...');
+        // Fallback a Redux si no encuentra el botón
+        await p.evaluate((prompt) => {
+          const store = window.__REDUX_STORE__ || window.store;
+          if (store) {
+            store.dispatch({
+              type: 'preferences/generateTest',
+              payload: { userPrompt: prompt }
+            });
+          }
+        }, userPrompt || '');
+      }
+
+      // 3. Esperar a que aparezca la primera pregunta o el indicador de carga
+      // Esperamos a que desaparezca el botón de inicio o aparezca el contenedor de preguntas
+      try {
+        await p.waitForSelector('.question-container, h3', { timeout: 5000 });
+      } catch (e) {
+        console.log('[startTest] Timeout esperando preguntas, continuando...');
+      }
+
+      return {
+        success: true,
+        message: 'Test iniciado correctamente'
+      };
+
+    } catch (error) {
+      console.error('[startTest] Error:', error);
+      throw error;
+    }
+  },
+
+  async finalizeTest() {
+    const p = await initBrowser();
+    console.log('[finalizeTest] Finalizando test y generando recomendación');
+
+    const result = await p.evaluate(() => {
+      const store = window.__REDUX_STORE__ || window.store;
+      if (!store) {
+        return { success: false, error: 'Redux store no disponible' };
+      }
+
+      try {
+        // Dispatch action to complete test
+        store.dispatch({ type: 'preferences/completeTest' });
+
+        // Dispatch action to get recommendation
+        store.dispatch({ type: 'preferences/getRecommendation' });
+
+        return {
+          success: true,
+          message: 'Test finalizado, generando recomendación...'
+        };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Error finalizando test');
+    }
+
+    return result;
+  },
+
+  async getTestRecommendation() {
+    const p = await initBrowser();
+    console.log('[getTestRecommendation] Obteniendo recomendación del test');
+
+    const result = await p.evaluate(() => {
+      const store = window.__REDUX_STORE__ || window.store;
+      if (!store) {
+        return { success: false, error: 'Redux store no disponible' };
+      }
+
+      try {
+        const state = store.getState();
+        const recommendation = state.preferences.recommendation;
+
+        if (!recommendation) {
+          return { success: false, error: 'No hay recomendación disponible' };
+        }
+
+        return {
+          success: true,
+          product: {
+            nombre: recommendation.product?.nombre || recommendation.nombre,
+            precio: recommendation.product?.precio || recommendation.precio,
+            descripcion: recommendation.product?.descripcion || recommendation.descripcion,
+            url_imagen: recommendation.product?.url_imagen || recommendation.url_imagen,
+            id_producto: recommendation.product?.id_producto || recommendation.id_producto
+          },
+          message: recommendation.message || '',
+          explanation: recommendation.explanation || recommendation.razon || ''
+        };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Error obteniendo recomendación');
+    }
+
+    return result;
   }
 };
 

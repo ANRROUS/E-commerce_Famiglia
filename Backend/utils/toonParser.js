@@ -20,6 +20,8 @@ export function parseToonResponse(text) {
         };
 
         const lines = text.split('\n');
+        let inFeedback = false;
+        let feedbackLines = [];
 
         for (const line of lines) {
             const trimmedLine = line.trim();
@@ -27,11 +29,17 @@ export function parseToonResponse(text) {
 
             if (trimmedLine.startsWith('THOUGHT:')) {
                 result.reasoning = trimmedLine.substring(8).trim();
+                inFeedback = false;
             }
             else if (trimmedLine.startsWith('FEEDBACK:')) {
-                result.userFeedback = trimmedLine.substring(9).trim();
+                // Start capturing feedback (multiline)
+                feedbackLines = [trimmedLine.substring(9).trim()];
+                inFeedback = true;
             }
             else if (trimmedLine.startsWith('TOOL:')) {
+                // End feedback capture when we hit a TOOL line
+                inFeedback = false;
+
                 // Parse tool line: TOOL: name | param1: val1 | param2: val2
                 const parts = trimmedLine.substring(5).split('|').map(p => p.trim());
                 const toolName = parts[0];
@@ -67,7 +75,14 @@ export function parseToonResponse(text) {
                     params: params
                 });
             }
+            else if (inFeedback) {
+                // Continue capturing feedback lines
+                feedbackLines.push(trimmedLine);
+            }
         }
+
+        // Join all feedback lines with newlines
+        result.userFeedback = feedbackLines.join('\n');
 
         // Validation
         if (!result.userFeedback && result.reasoning) {

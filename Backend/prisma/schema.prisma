@@ -23,6 +23,8 @@ model detalle_pedido {
   id_pedido         BigInt?
   pedido            pedido?   @relation(fields: [id_pedido], references: [id_pedido], onDelete: NoAction, onUpdate: NoAction)
   producto          producto? @relation(fields: [id_producto], references: [id_producto], onDelete: NoAction, onUpdate: NoAction)
+  
+  @@unique([id_pedido, id_producto], name: "id_pedido_id_producto")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.

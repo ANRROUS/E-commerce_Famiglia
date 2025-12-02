@@ -100,14 +100,29 @@ const Header = () => {
   // 🔹 Logout
   const handleLogout = async () => {
     try {
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("token");
+      // Llamar al endpoint de logout primero
       await authAPI.logout();
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
+      // Continuar con el logout local incluso si hay error en el servidor
     } finally {
+      // Limpiar todos los tokens y datos locales
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("token");
+      localStorage.removeItem("fotoPerfil");
+      sessionStorage.clear();
+      
+      // Limpiar cookies (aunque sean HTTPOnly, intentamos limpiarlas)
+      document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      
+      // Actualizar estado de Redux
       dispatch(logout());
+      
+      // Navegar al home
       handleNavigation("/");
+      
+      // Opcional: recargar la página para asegurar limpieza completa
+      setTimeout(() => window.location.reload(), 100);
     }
   };
 

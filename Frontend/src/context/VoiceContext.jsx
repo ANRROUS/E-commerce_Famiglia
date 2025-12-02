@@ -321,13 +321,25 @@ export function VoiceProvider({ children }) {
   const handleVoiceLogout = useCallback(async () => {
     try {
       await authAPI.logout();
-      localStorage.clear();
-      sessionStorage.clear();
-      dispatch(logout());
-      window.location.href = '/';
+      speak('Cerrando sesión exitosamente');
     } catch (err) {
       console.error('[Voice Context] Error al cerrar sesión:', err);
-      speak('Error al cerrar sesión');
+      speak('Error al conectar con el servidor, cerrando sesión localmente');
+    } finally {
+      // Limpiar todos los tokens y datos locales
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("token");
+      localStorage.removeItem("fotoPerfil");
+      sessionStorage.clear();
+      
+      // Limpiar cookies
+      document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      
+      // Actualizar estado de Redux
+      dispatch(logout());
+      
+      // Navegar al home y recargar
+      window.location.href = '/';
     }
   }, [dispatch, speak]);
 

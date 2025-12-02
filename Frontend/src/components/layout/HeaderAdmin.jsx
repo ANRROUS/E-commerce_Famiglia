@@ -43,8 +43,23 @@ const HeaderAdmin = () => {
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
     } finally {
+      // Limpiar todos los tokens y datos locales
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("token");
+      localStorage.removeItem("fotoPerfil");
+      sessionStorage.clear();
+      
+      // Limpiar cookies
+      document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      
+      // Actualizar estado de Redux
       dispatch(logout());
+      
+      // Navegar al home
       navigate("/");
+      
+      // Recargar para asegurar limpieza
+      setTimeout(() => window.location.reload(), 100);
     }
   };
 

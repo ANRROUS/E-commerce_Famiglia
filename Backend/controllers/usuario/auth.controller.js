@@ -179,13 +179,29 @@ export const getPerfil = async (req, res) => {
 
 export const logout = async (req, res) => {
   try {
+    // Obtener userId si está disponible
+    const userId = req.user?.id || null;
+
+    // Limpiar la cookie authToken
     res.clearCookie("authToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
+      path: "/"
     });
 
     res.json({ message: "Logout exitoso" });
+
+    // Log de auditoría
+    if (userId) {
+      logAuditoria({
+        usuarioId: userId,
+        accion: "logout",
+        recurso: "usuario",
+        recursoId: userId,
+        req,
+      }).catch((auditErr) => console.warn("Error en logAuditoria", auditErr));
+    }
   } catch (error) {
     res
       .status(500)

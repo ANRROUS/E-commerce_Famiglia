@@ -117,25 +117,42 @@ export const addToCart = async (req, res) => {
       });
     }
 
-    // Obtener o crear carrito
-    const pedido = await getOrCreateCart(userId);
+    // Obtener o crear carrito (solo 1 query)
+    let pedido = await prisma.pedido.findFirst({
+      where: {
+        id_usuario: BigInt(userId),
+        estado: 'carrito'
+      },
+      select: { id_pedido: true } // Solo necesitamos el ID
+    });
 
-    // Verificar si el producto ya existe en el carrito
+    if (!pedido) {
+      pedido = await prisma.pedido.create({
+        data: {
+          id_usuario: BigInt(userId),
+          estado: 'carrito',
+          fecha: new Date(),
+          envio: 'Recojo en tienda'
+        },
+        select: { id_pedido: true }
+      });
+    }
+
+    // Verificar si existe y actualizar/crear (optimizado con select minimal)
     const detalleExistente = await prisma.detalle_pedido.findFirst({
       where: {
         id_pedido: pedido.id_pedido,
         id_producto: BigInt(id_producto)
-      }
+      },
+      select: { id_detalle_pedido: true, cantidad: true }
     });
 
     if (detalleExistente) {
-      // Actualizar cantidad
       await prisma.detalle_pedido.update({
         where: { id_detalle_pedido: detalleExistente.id_detalle_pedido },
         data: { cantidad: detalleExistente.cantidad + cantidad }
       });
     } else {
-      // Crear nuevo detalle
       await prisma.detalle_pedido.create({
         data: {
           id_pedido: pedido.id_pedido,
@@ -145,19 +162,24 @@ export const addToCart = async (req, res) => {
       });
     }
 
-    // Obtener carrito actualizado
-    const pedidoActualizado = await prisma.pedido.findUnique({
+    // Obtener solo los datos necesarios para la respuesta
+    const detalles = await prisma.detalle_pedido.findMany({
       where: { id_pedido: pedido.id_pedido },
-      include: {
-        detalle_pedido: {
-          include: {
-            producto: true
+      select: {
+        id_detalle_pedido: true,
+        cantidad: true,
+        producto: {
+          select: {
+            id_producto: true,
+            nombre: true,
+            precio: true,
+            url_imagen: true
           }
         }
       }
     });
 
-    const { items, totalQuantity, totalAmount } = calculateTotals(pedidoActualizado.detalle_pedido);
+    const { items, totalQuantity, totalAmount } = calculateTotals(detalles);
 
     res.json({
       success: true,
@@ -168,15 +190,18 @@ export const addToCart = async (req, res) => {
       totalAmount
     });
 
-    logAuditoria({
-      accion: 'agregar_al_carrito',
-      recurso: 'producto',
-      recursoId: String(id_producto),
-      req,
-      meta: { 
-        cantidad, 
-        pedidoId: String(pedido.id_pedido) 
-      }
+    // Auditoría asíncrona (no bloquea la respuesta)
+    setImmediate(() => {
+      logAuditoria({
+        accion: 'agregar_al_carrito',
+        recurso: 'producto',
+        recursoId: String(id_producto),
+        req,
+        meta: {
+          cantidad,
+          pedidoId: String(pedido.id_pedido)
+        }
+      });
     });
 
   } catch (error) {
@@ -208,45 +233,52 @@ export const updateCartItem = async (req, res) => {
       });
     }
 
-    // Verificar que el detalle pertenece al usuario
-    const detalle = await prisma.detalle_pedido.findUnique({
+    // Actualizar y obtener datos en una sola operación
+    const detalleActualizado = await prisma.detalle_pedido.update({
       where: { id_detalle_pedido: BigInt(id_detalle) },
-      include: {
-        pedido: true
+      data: { cantidad: parseInt(cantidad) },
+      select: {
+        id_pedido: true,
+        pedido: {
+          select: {
+            id_usuario: true,
+            id_pedido: true
+          }
+        }
       }
     });
 
-    if (!detalle || detalle.pedido.id_usuario.toString() !== userId.toString()) {
+    // Verificar autorización
+    if (detalleActualizado.pedido.id_usuario.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
         error: 'No autorizado'
       });
     }
 
-    // Actualizar cantidad
-    await prisma.detalle_pedido.update({
-      where: { id_detalle_pedido: BigInt(id_detalle) },
-      data: { cantidad: parseInt(cantidad) }
-    });
-
-    // Obtener carrito actualizado
-    const pedido = await prisma.pedido.findUnique({
-      where: { id_pedido: detalle.id_pedido },
-      include: {
-        detalle_pedido: {
-          include: {
-            producto: true
+    // Obtener solo los datos necesarios
+    const detalles = await prisma.detalle_pedido.findMany({
+      where: { id_pedido: detalleActualizado.id_pedido },
+      select: {
+        id_detalle_pedido: true,
+        cantidad: true,
+        producto: {
+          select: {
+            id_producto: true,
+            nombre: true,
+            precio: true,
+            url_imagen: true
           }
         }
       }
     });
 
-    const { items, totalQuantity, totalAmount } = calculateTotals(pedido.detalle_pedido);
+    const { items, totalQuantity, totalAmount } = calculateTotals(detalles);
 
     res.json({
       success: true,
       message: 'Cantidad actualizada',
-      orderId: hashOrderId(pedido.id_pedido),
+      orderId: hashOrderId(detalleActualizado.id_pedido),
       items,
       totalQuantity,
       totalAmount
@@ -273,61 +305,69 @@ export const removeFromCart = async (req, res) => {
       });
     }
 
-    // Verificar que el detalle pertenece al usuario
-    const detalle = await prisma.detalle_pedido.findUnique({
+    // Eliminar y obtener id_pedido en una sola operación
+    const detalleEliminado = await prisma.detalle_pedido.delete({
       where: { id_detalle_pedido: BigInt(id) },
-      include: {
-        pedido: true
+      select: {
+        id_pedido: true,
+        pedido: {
+          select: {
+            id_usuario: true,
+            id_pedido: true
+          }
+        }
       }
     });
 
-    if (!detalle || detalle.pedido.id_usuario.toString() !== userId.toString()) {
+    // Verificar autorización
+    if (detalleEliminado.pedido.id_usuario.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
         error: 'No autorizado'
       });
     }
 
-    const idPedido = detalle.id_pedido;
-
-    // Eliminar detalle
-    await prisma.detalle_pedido.delete({
-      where: { id_detalle_pedido: BigInt(id) }
-    });
-
-    // Obtener carrito actualizado
-    const pedido = await prisma.pedido.findUnique({
-      where: { id_pedido: idPedido },
-      include: {
-        detalle_pedido: {
-          include: {
-            producto: true
+    // Obtener solo los datos necesarios
+    const detalles = await prisma.detalle_pedido.findMany({
+      where: { id_pedido: detalleEliminado.id_pedido },
+      select: {
+        id_detalle_pedido: true,
+        cantidad: true,
+        producto: {
+          select: {
+            id_producto: true,
+            nombre: true,
+            precio: true,
+            url_imagen: true
           }
         }
       }
     });
 
-    const { items, totalQuantity, totalAmount } = calculateTotals(pedido.detalle_pedido);
+    const { items, totalQuantity, totalAmount } = calculateTotals(detalles);
 
     res.json({
       success: true,
       message: 'Producto eliminado del carrito',
-      orderId: hashOrderId(pedido.id_pedido),
+      orderId: hashOrderId(detalleEliminado.id_pedido),
       items,
       totalQuantity,
       totalAmount
     });
-    // Registrar auditoría de eliminación del carrito
-    logAuditoria({
-      accion: 'eliminar_carrito',
-      recurso: 'detalle_pedido',
-      recursoId: String(id),
-      req,
-      meta: { 
-        pedidoId: String(idPedido), 
-        totalQuantity, 
-        totalAmount 
-      }
+
+    // Auditoría asíncrona
+    setImmediate(() => {
+      logAuditoria({
+        accion: 'eliminar_carrito',
+        recurso: 'detalle_pedido',
+        recursoId: String(id),
+        req,
+        meta: {
+          pedidoId: String(detalleEliminado.id_pedido),
+          totalQuantity,
+          totalAmount
+        }
+      });
     });
 
   } catch (error) {
