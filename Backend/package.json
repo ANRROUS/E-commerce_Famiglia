@@ -12,6 +12,7 @@
   "author": "famiglia",
   "license": "ISC",
   "dependencies": {
+    "@google-cloud/text-to-speech": "^6.4.0",
     "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/sdk": "^1.21.1",
     "@prisma/client": "^6.18.0",
