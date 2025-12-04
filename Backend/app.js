@@ -19,7 +19,7 @@ import voiceRoutes from './routes/voice/voiceRoutes.js';
 const app = express();
 app.use(morgan('dev'));
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: 'https://radiant-truth-production.up.railway.app',
     credentials: true
 }));
 
