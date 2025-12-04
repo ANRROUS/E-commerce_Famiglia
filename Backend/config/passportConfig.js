@@ -31,7 +31,7 @@ passport.use(
             data: {
               nombre: name,
               correo: email,
-              contraseña: randomPassword,
+              contrase_a: randomPassword,
               rol: "U", // Default user role
             },
           });

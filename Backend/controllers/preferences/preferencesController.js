@@ -12,16 +12,7 @@ export const generateTest = async (req, res) => {
       success: true,
       data: testData
     });
-    logAuditoria({
-      accion: 'generar_test',
-      recurso: 'test',
-      ruta: req.originalUrl || req.url,
-      req,
-      meta: {
-        promptLength: String((userPrompt || '').length),
-      }
-    });
-    
+
   } catch (error) {
     console.error('Error en generateTest:', error);
     res.status(500).json({
@@ -37,7 +28,7 @@ export const getRecommendation = async (req, res) => {
     const { userPrompt, questions, answers } = req.body;
     // Obtener id del token JWT (la propiedad es 'id', no 'id_usuario')
     const userId = req.user?.id || null;
-    
+
     console.log('👤 Usuario autenticado:', userId ? `ID: ${userId}` : 'No autenticado');
 
     if (!questions || !Array.isArray(questions)) {
@@ -104,13 +95,13 @@ export const getRecommendation = async (req, res) => {
         guardadoEnBD: Boolean(testRecord)
       }
     });
-  
+
 
     res.json({
       success: true,
       data: recommendation
     });
-    
+
   } catch (error) {
     console.error('Error en getRecommendation:', error);
     res.status(500).json({
