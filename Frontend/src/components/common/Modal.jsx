@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
-// Modal genérico reutilizable
+// Modal genérico reutilizable - usando Portal para evitar problemas de posicionamiento
 const Modal = ({ isOpen, onClose, title, children }) => {
   // Cerrar modal con la tecla ESC
   useEffect(() => {
@@ -15,7 +16,11 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 
   // Bloquear scroll del body cuando el modal está abierto
   useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : 'auto';
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
     return () => {
       document.body.style.overflow = 'auto';
     };
@@ -23,16 +28,32 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+  // Usar createPortal para renderizar el modal en el body, fuera del flujo del DOM
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
       {/* Fondo con desenfoque */}
       <div
-        className="fixed inset-0 backdrop-blur-[6px] transition-all duration-300"
+        className="absolute inset-0 backdrop-blur-[6px] bg-black/20"
         onClick={onClose}
         aria-hidden="true"
       />
       {/* Contenedor del modal */}
-      <div className="relative bg-white rounded-lg shadow-xl border-2 border-[#b17b6b] max-w-md w-full mx-4 p-6 z-10 max-h-[90vh] overflow-y-auto font-['Montserrat']">
+      <div
+        className="relative bg-white rounded-lg shadow-xl border-2 border-[#b17b6b] max-w-md w-[95%] sm:w-full mx-4 p-6 z-10 max-h-[90vh] overflow-y-auto font-['Montserrat']"
+        onClick={(e) => e.stopPropagation()}
+      >
         <IconButton
           onClick={onClose}
           sx={{
@@ -51,7 +72,8 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 
         <div className="text-sm text-[#4a2b2b] leading-relaxed">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

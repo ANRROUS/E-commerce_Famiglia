@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import { Box, Typography, TextField, Button, CircularProgress, Alert } from "@mui/material";
+import axios from "axios";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 const Complaints = () => {
   const [nombre, setNombre] = useState("");
@@ -8,31 +11,46 @@ const Complaints = () => {
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState({ show: false, type: "", message: "" });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setAlert({ show: false, type: "", message: "" });
 
-    // Simulamos el envío con un retraso de 2 segundos
-    setTimeout(() => {
-      if (nombre && correo && motivo) {
-        setAlert({
-          show: true,
-          type: "success",
-          message: "Tu reclamo fue enviado correctamente. ¡Gracias por tu tiempo!",
-        });
-        setNombre("");
-        setCorreo("");
-        setMotivo("");
-      } else {
-        setAlert({
-          show: true,
-          type: "error",
-          message: "Ocurrió un error al enviar tu reclamo. Revisa los campos e intenta nuevamente.",
-        });
-      }
+    if (!nombre || !correo || !motivo) {
+      setAlert({
+        show: true,
+        type: "error",
+        message: "Por favor, completa todos los campos.",
+      });
       setLoading(false);
-    }, 1000);
+      return;
+    }
+
+    try {
+      await axios.post(`${API_URL}/contact/send-complaint`, {
+        nombre,
+        email: correo,
+        motivo,
+      });
+
+      setAlert({
+        show: true,
+        type: "success",
+        message: "Tu reclamo fue enviado correctamente. ¡Gracias por tu tiempo! Te responderemos pronto.",
+      });
+      setNombre("");
+      setCorreo("");
+      setMotivo("");
+    } catch (error) {
+      console.error("Error enviando reclamo:", error);
+      setAlert({
+        show: true,
+        type: "error",
+        message: "Ocurrió un error al enviar tu reclamo. Por favor, intenta nuevamente.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -129,7 +147,7 @@ const Complaints = () => {
             },
           }}
         />
-        
+
         <Typography sx={{ fontWeight: 700, fontSize: "0.9rem", mt: 1 }}>
           Motivo del reclamo:
         </Typography>

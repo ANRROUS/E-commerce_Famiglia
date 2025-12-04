@@ -294,7 +294,6 @@ export default function PreferencesTest() {
                   bgcolor: answers[currentQuestion] === opt.value ? "#FFF5F5" : "white",
                   cursor: "pointer",
                   transition: "all 0.2s",
-                  height: "100%",
                   display: "flex",
                   flexDirection: "column",
                   "&:hover": { borderColor: palette.primary, transform: "translateY(-2px)" }
