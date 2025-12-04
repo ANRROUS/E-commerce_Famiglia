@@ -26,6 +26,7 @@ import Complaints from "./pages/Complaints";
 import { setUser, authCheckComplete } from "./redux/slices/authSlice";
 import { authAPI } from "./services/api";
 import { SnackbarProvider } from 'notistack';
+import GoogleCallback from "./pages/GoogleCallback";
 
 import { enviarEventoAuditoria } from "./services/api/auditoriaClient.js";
 
@@ -150,6 +151,7 @@ function Layout() {
           <Route path="/order-confirmation" element={<ProtectedRoute><OrderConfirmation /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/test" element={<ProtectedRoute><PreferencesTest /></ProtectedRoute>} />
+          <Route path="/auth/google/callback" element={<GoogleCallback />} />
         </Routes>
       </main>
 
@@ -167,7 +169,7 @@ function App() {
         v7_relativeSplatPath: true
       }}
     >
-      <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+      <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <LoginModalProvider>
           <Layout />
         </LoginModalProvider>

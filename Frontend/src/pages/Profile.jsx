@@ -40,7 +40,7 @@ import {
   ReceiptLong
 } from "@mui/icons-material";
 import defaultAvatar from "../assets/images/img-default-avatar.png";
-import { pedidoAPI } from "../services/api";
+import { pedidoAPI, authAPI } from "../services/api";
 import { twofaAPI } from "../services/api/twofaAPI";
 import * as crypto from "crypto-js";
 
@@ -190,9 +190,52 @@ export default function Profile() {
                   accept="image/*"
                   id="input-foto"
                   style={{ display: "none" }}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const archivo = e.target.files[0];
-                    if (archivo) setFoto(URL.createObjectURL(archivo));
+                    if (!archivo) return;
+
+                    // Validate file size (max 5MB)
+                    if (archivo.size > 5 * 1024 * 1024) {
+                      enqueueSnackbar("La imagen no puede superar los 5MB", { variant: "error" });
+                      return;
+                    }
+
+                    // Show preview immediately
+                    setFoto(URL.createObjectURL(archivo));
+
+                    try {
+                      // Convert to base64
+                      const reader = new FileReader();
+                      reader.onloadend = async () => {
+                        const base64Image = reader.result;
+
+                        try {
+                          const response = await authAPI.uploadProfileImage({
+                            image: base64Image,
+                            fileName: archivo.name,
+                            contentType: archivo.type
+                          });
+
+                          if (response.data.imageUrl) {
+                            setFoto(response.data.imageUrl);
+                            // Update localStorage with new image URL
+                            const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+                            storedUser.url_imagen = response.data.imageUrl;
+                            localStorage.setItem("user", JSON.stringify(storedUser));
+                            enqueueSnackbar("Foto de perfil actualizada", { variant: "success" });
+                          }
+                        } catch (uploadError) {
+                          console.error("Error uploading image:", uploadError);
+                          enqueueSnackbar("Error al subir la imagen", { variant: "error" });
+                          // Revert to previous image
+                          setFoto(user?.url_imagen || defaultAvatar);
+                        }
+                      };
+                      reader.readAsDataURL(archivo);
+                    } catch (err) {
+                      console.error("Error processing image:", err);
+                      enqueueSnackbar("Error al procesar la imagen", { variant: "error" });
+                    }
                   }}
                 />
                 <label htmlFor="input-foto">

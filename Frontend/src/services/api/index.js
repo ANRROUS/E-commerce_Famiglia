@@ -1,6 +1,6 @@
 import API from "./axiosInstance.js";
 
-export const ProductosAPI= {
+export const ProductosAPI = {
     getAll: () => API.get('/productos'),
     getById: (id) => API.get(`/productos/${id}`),
     getByCategoria: (id_categoria) => API.get(`/productos/categoria/${id_categoria}`)
@@ -12,11 +12,12 @@ export const categoriaAPI = {
 }
 
 export const authAPI = {
-    register: (userData) => API.post('/auth/register', userData),
-    login: (credentials) => API.post('/auth/login', credentials),
-    verify2FA: (data) => API.post("/auth/verify-2fa", data),
-    logout: () => API.post('/auth/logout'),
-    getPerfil: () => API.get('/auth/perfil')
+    register: (userData) => API.post('/api/auth/register', userData),
+    login: (credentials) => API.post('/api/auth/login', credentials),
+    verify2FA: (data) => API.post("/api/auth/verify-2fa", data),
+    logout: () => API.post('/api/auth/logout'),
+    getPerfil: () => API.get('/api/auth/perfil'),
+    uploadProfileImage: (imageData) => API.post('/api/auth/perfil/upload-image', imageData)
 }
 
 export const pagoAPI = {
@@ -32,9 +33,3 @@ export const pedidoAPI = {
 export const preferencesAPI = {
     getHistorialTests: () => API.get('/api/preferences/history')
 }
-
-
-
-
-
-
