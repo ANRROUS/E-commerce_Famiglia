@@ -170,8 +170,8 @@ export default function Catalog() {
 
   const handleAddToCart = useCallback(
     (product) => {
-      setIsAdding(true);
-      dispatch(addToCartAsync(product))
+      // setIsAdding(true); // Removed global loading state as per request to use local card loading
+      return dispatch(addToCartAsync(product))
         .unwrap()
         .then(() => {
           setNotification({
@@ -184,8 +184,8 @@ export default function Catalog() {
             open: true,
             message: (err && err.error) || "Error al agregar al carrito",
           })
-        )
-        .finally(() => setIsAdding(false));
+        );
+      // .finally(() => setIsAdding(false));
     },
     [dispatch]
   );

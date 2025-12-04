@@ -51,9 +51,11 @@ const Delivery = ({ id }) => {
             />
           </Box>
 
-          <button className="bg-[#ff441f] text-white font-bold rounded-full px-10 py-3 text-lg shadow-md hover:bg-[#e63d18] transition-all mb-8">
-            Haz click aquí
-          </button>
+          <a href="https://www.rappi.com.pe/search?text=Famiglia" target="_blank" rel="noopener noreferrer">
+            <button className="bg-[#ff441f] text-white font-bold rounded-full px-10 py-3 text-lg shadow-md hover:bg-[#e63d18] transition-all mb-8 cursor-pointer">
+              Haz click aquí
+            </button>
+          </a>
 
           <Typography
             variant="body1"
@@ -85,9 +87,11 @@ const Delivery = ({ id }) => {
             />
           </Box>
 
-          <Box className="bg-[#25d366] rounded-full px-10 py-3 text-white font-bold text-lg shadow-md mb-8">
-            949978664 | 949870092
-          </Box>
+          <a href="https://wa.me/51972199525" target="_blank" rel="noopener noreferrer">
+            <Box className="bg-[#25d366] rounded-full px-10 py-3 text-white font-bold text-lg shadow-md mb-8 hover:bg-[#20bd5a] transition-colors cursor-pointer">
+              972 199 525
+            </Box>
+          </a>
 
           <Typography
             variant="body1"

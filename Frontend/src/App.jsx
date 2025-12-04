@@ -114,7 +114,7 @@ function Layout() {
     <>
       {!hideHeader && (showAdminHeader ? <HeaderAdmin /> : <Header />)}
 
-      <main className="min-h-screen flex justify-center">
+      <main className="min-h-screen flex justify-center w-full">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/home" element={<Navigate to="/" replace />} />

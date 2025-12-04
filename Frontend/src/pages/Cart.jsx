@@ -11,6 +11,7 @@ import {
   Typography,
   IconButton,
   Button,
+  CircularProgress
 } from "@mui/material";
 import { Add, Remove } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
@@ -88,6 +89,7 @@ const Cart = () => {
 
   // State for delete confirmation modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteLoadingOpen, setDeleteLoadingOpen] = useState(false);
   const [productToRemoveId, setProductToRemoveId] = useState(null);
 
   // Cargar carrito al montar el componente
@@ -146,15 +148,24 @@ const Cart = () => {
     setDeleteModalOpen(true);
   };
 
-  const handleRemoveConfirmed = () => {
+  const handleRemoveConfirmed = async () => {
     if (productToRemoveId) {
+      // Cerrar modal de confirmación y abrir loading
+      setDeleteModalOpen(false);
+      setDeleteLoadingOpen(true);
+
       // Limpiar el temporizador si existe para este producto
       if (debounceTimers.current[productToRemoveId]) {
         clearTimeout(debounceTimers.current[productToRemoveId]);
         delete debounceTimers.current[productToRemoveId];
       }
-      dispatch(removeFromCartAsync(productToRemoveId));
-      setDeleteModalOpen(false);
+
+      // Esperar un momento para que se vea el loading (opcional, mejora UX)
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      await dispatch(removeFromCartAsync(productToRemoveId));
+
+      setDeleteLoadingOpen(false);
       setProductToRemoveId(null);
     }
   };
@@ -476,6 +487,20 @@ const Cart = () => {
               Eliminar
             </Button>
           </Box>
+        </Box>
+      </Modal>
+
+      {/* MODAL DE CARGA AL ELIMINAR */}
+      <Modal
+        isOpen={deleteLoadingOpen}
+        onClose={() => { }} // No permitir cerrar manualmente
+        title="" // Sin título para centrar el contenido
+      >
+        <Box sx={{ textAlign: "center", py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <CircularProgress size={40} sx={{ color: "#8b3e3e" }} />
+          <Typography sx={{ color: "#666", fontSize: "1.1rem", fontWeight: 500 }}>
+            Eliminando producto...
+          </Typography>
         </Box>
       </Modal>
     </Box>

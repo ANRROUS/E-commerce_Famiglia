@@ -30,7 +30,11 @@ export const procesarPago = async (req, res) => {
             include: {
                 detalle_pedido: {
                     include: {
-                        producto: true,
+                        producto: {
+                            include: {
+                                stock: true
+                            }
+                        }
                     },
                 },
             },
@@ -44,31 +48,58 @@ export const procesarPago = async (req, res) => {
             return res.status(400).json({ error: "El pedido no tiene productos" });
         }
 
+        // Validar stock
+        for (const item of pedido.detalle_pedido) {
+            const stockDisponible = item.producto.stock?.cantidad || 0;
+            if (stockDisponible < item.cantidad) {
+                return res.status(400).json({ 
+                    error: `Stock insuficiente para el producto: ${item.producto.nombre}. Disponible: ${stockDisponible}, Solicitado: ${item.cantidad}` 
+                });
+            }
+        }
+
         // Calcular el total
         const total = pedido.detalle_pedido.reduce((sum, item) => {
             return sum + (item.cantidad * item.producto.precio);
         }, 0);
 
-        // Crear el registro de pago
-        const pago = await prisma.pago.create({
-            data: {
-                id_pedido: pedido.id_pedido,
-                medio,
-                numero: parseInt(numero),
-                cod_ver: parseInt(cod_ver),
-                total,
-                fecha: new Date(),
-            },
-        });
+        // Iniciar transacción
+        const result = await prisma.$transaction(async (prisma) => {
+            // Decrementar stock
+            for (const item of pedido.detalle_pedido) {
+                await prisma.stock.update({
+                    where: { id_producto: item.producto.id_producto },
+                    data: {
+                        cantidad: {
+                            decrement: item.cantidad
+                        }
+                    }
+                });
+            }
 
-        // Actualizar el estado del pedido
-        await prisma.pedido.update({
-            where: { id_pedido: pedido.id_pedido },
-            data: { 
-                estado: "confirmado",
-                envio: envio || "pendiente",
-                fecha: new Date()
-            },
+            // Crear el registro de pago
+            const pago = await prisma.pago.create({
+                data: {
+                    id_pedido: pedido.id_pedido,
+                    medio,
+                    numero: parseInt(numero),
+                    cod_ver: parseInt(cod_ver),
+                    total,
+                    fecha: new Date(),
+                },
+            });
+
+            // Actualizar el estado del pedido
+            await prisma.pedido.update({
+                where: { id_pedido: pedido.id_pedido },
+                data: { 
+                    estado: "confirmado",
+                    envio: envio || "pendiente",
+                    fecha: new Date()
+                },
+            });
+
+            return pago;
         });
 
         // Generar el hash del ID del pedido para mostrar al usuario
@@ -77,10 +108,10 @@ export const procesarPago = async (req, res) => {
         res.status(201).json({ 
             mensaje: "Pago procesado exitosamente", 
             pago: {
-                id_pago: pago.id_pago.toString(),
-                medio: pago.medio,
-                total: pago.total,
-                fecha: pago.fecha
+                id_pago: result.id_pago.toString(),
+                medio: result.medio,
+                total: result.total,
+                fecha: result.fecha
             },
             pedido: {
                 id_pedido: hashedOrderId,

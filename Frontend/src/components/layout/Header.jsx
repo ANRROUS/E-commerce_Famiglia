@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Box, Button, IconButton } from "@mui/material";
+import { Box, Button, IconButton, Menu, MenuItem, ListItemIcon } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import Logout from "@mui/icons-material/Logout";
 import { useNavigate, useLocation } from "react-router-dom";
 import imgLogoFamiglia from "../../assets/images/img_logoFamigliawithoutBorders.png";
 import RegisterForm from "../forms/RegisterForm";
@@ -15,6 +16,7 @@ import { useLoginModal } from "../../context/LoginModalContext";
 
 const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState(null);
   const [underlineStyle, setUnderlineStyle] = useState({});
   const [showRegister, setShowRegister] = useState(false);
   const { isLoginModalOpen: showLogin, showLoginModal, hideLoginModal } = useLoginModal();
@@ -33,7 +35,10 @@ const Header = () => {
     delivery: useRef(null),
     test: useRef(null),
     contact: useRef(null),
+    cart: useRef(null),
+    profile: useRef(null),
   };
+  const containerRef = useRef(null);
 
   // 🔹 Detecta cambio de tamaño de ventana
   useEffect(() => {
@@ -44,29 +49,6 @@ const Header = () => {
 
   // 🔹 Subrayado dinámico (mejorado)
   useEffect(() => {
-    const path = location.pathname;
-    const mapping = {
-      "/": navRefs.home,
-      "/carta": navRefs.carta,
-      "/delivery": navRefs.delivery,
-      "/test": navRefs.test,
-      "/contact-us": navRefs.contact,
-    };
-
-    const activeRef = Object.entries(mapping).find(([key]) => path === key)?.[1];
-
-    if (activeRef?.current) {
-      const rect = activeRef.current.getBoundingClientRect();
-      const parentRect = activeRef.current.parentNode.getBoundingClientRect();
-      setUnderlineStyle({
-        width: rect.width,
-        left: rect.left - parentRect.left,
-      });
-    }
-  }, [location.pathname]);
-
-  // 🔹 Recalcula al redimensionar ventana
-  useEffect(() => {
     const updateUnderline = () => {
       const path = location.pathname;
       const mapping = {
@@ -75,19 +57,26 @@ const Header = () => {
         "/delivery": navRefs.delivery,
         "/test": navRefs.test,
         "/contact-us": navRefs.contact,
+        "/cart": navRefs.cart,
+        "/profile": navRefs.profile,
       };
 
       const activeRef = Object.entries(mapping).find(([key]) => path === key)?.[1];
-      if (activeRef?.current) {
+
+      if (activeRef?.current && containerRef.current) {
         const rect = activeRef.current.getBoundingClientRect();
-        const parentRect = activeRef.current.parentNode.getBoundingClientRect();
+        const parentRect = containerRef.current.getBoundingClientRect();
         setUnderlineStyle({
           width: rect.width,
           left: rect.left - parentRect.left,
+          opacity: 1,
         });
+      } else {
+        setUnderlineStyle((prev) => ({ ...prev, opacity: 0 }));
       }
     };
 
+    updateUnderline();
     window.addEventListener("resize", updateUnderline);
     return () => window.removeEventListener("resize", updateUnderline);
   }, [location.pathname]);
@@ -149,19 +138,19 @@ const Header = () => {
       className={`w-full font-[Montserrat] border-b border-[#eecbcb] transition-all duration-300 ${location.pathname === "/" ? "bg-white" : "sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-sm"
         }`}
     >
-      <Box className="max-w-[1400px] mx-auto flex items-center justify-between px-6 py-2 md:px-12">
+      <Box ref={containerRef} className="max-w-[1400px] mx-auto flex items-center justify-between px-6 py-1 md:px-12 relative">
         {/* Logo */}
         <img
           src={imgLogoFamiglia}
           alt="Panadería Famiglia"
-          className="w-24 sm:w-28 md:w-32 object-contain cursor-pointer transition-transform hover:scale-105"
+          className="w-20 sm:w-24 md:w-28 object-contain cursor-pointer transition-transform hover:scale-105"
           onClick={() => handleNavigation("/")}
         />
 
         {/* 🔹 Menú de escritorio */}
         {!isMobile ? (
           <>
-            <Box className="flex items-center gap-8 text-[14px] font-medium relative tracking-wide">
+            <Box className="flex items-center gap-8 text-[14px] font-medium tracking-wide">
               {navLinks.map(({ label, path, ref }) => (
                 <span
                   key={path}
@@ -173,19 +162,13 @@ const Header = () => {
                   {label}
                 </span>
               ))}
-              <Box
-                className="absolute bottom-[-6px] h-[2px] bg-[#8b3e3e] transition-all duration-300 ease-out rounded-full"
-                style={{
-                  width: underlineStyle.width,
-                  left: underlineStyle.left,
-                }}
-              />
             </Box>
 
             <Box className="flex gap-4 items-center">
               {isAuthenticated ? (
                 <>
                   <IconButton
+                    ref={navRefs.cart}
                     onClick={() => handleNavigation("/cart")}
                     sx={{
                       color: "#8b3e3e",
@@ -194,7 +177,7 @@ const Header = () => {
                       "&:hover": { transform: "scale(1.1)" }
                     }}
                   >
-                    <ShoppingCartIcon fontSize="small" />
+                    <ShoppingCartIcon />
                     {totalQuantity > 0 && (
                       <Box
                         sx={{
@@ -204,12 +187,12 @@ const Header = () => {
                           backgroundColor: "#e74c3c",
                           color: "white",
                           borderRadius: "50%",
-                          width: 16,
-                          height: 16,
+                          width: 18,
+                          height: 18,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: "bold",
                           boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
                         }}
@@ -220,39 +203,66 @@ const Header = () => {
                   </IconButton>
 
                   {/* Divider */}
-                  <div className="h-5 w-[1px] bg-[#eecbcb]"></div>
+                  <div className="h-6 w-[1px] bg-[#eecbcb]"></div>
 
-                  <Box
-                    className="flex items-center gap-2 cursor-pointer hover:bg-[#fff0f0] px-2 py-1 rounded-full transition-colors"
-                    onClick={() => handleNavigation("/profile")}
-                  >
-                    <AccountCircleIcon sx={{ color: "#8b3e3e", fontSize: 22 }} />
-                    <span className="text-sm font-semibold text-[#8b3e3e] max-w-[100px] truncate">{user?.nombre}</span>
-                  </Box>
-
-                  <Button
-                    onClick={handleLogout}
-                    variant="outlined"
-                    size="small"
+                  <IconButton
+                    ref={navRefs.profile}
+                    onClick={(e) => setAnchorEl(e.currentTarget)}
                     sx={{
-                      borderColor: "#8b3e3e",
                       color: "#8b3e3e",
-                      fontWeight: 600,
-                      textTransform: "none",
-                      borderRadius: "6px",
-                      px: 2,
-                      py: 0.2,
-                      fontSize: '0.8rem',
-                      minWidth: 'auto',
-                      "&:hover": {
-                        backgroundColor: "#8b3e3e",
-                        color: "#fff",
-                        borderColor: "#8b3e3e",
-                      },
+                      transition: "transform 0.2s",
+                      "&:hover": { transform: "scale(1.1)" }
                     }}
                   >
-                    Salir
-                  </Button>
+                    <AccountCircleIcon sx={{ fontSize: 28 }} />
+                  </IconButton>
+
+                  <Menu
+                    anchorEl={anchorEl}
+                    open={Boolean(anchorEl)}
+                    onClose={() => setAnchorEl(null)}
+                    PaperProps={{
+                      elevation: 0,
+                      sx: {
+                        overflow: 'visible',
+                        filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.1))',
+                        mt: 1.5,
+                        '& .MuiAvatar-root': {
+                          width: 32,
+                          height: 32,
+                          ml: -0.5,
+                          mr: 1,
+                        },
+                        '&:before': {
+                          content: '""',
+                          display: 'block',
+                          position: 'absolute',
+                          top: 0,
+                          right: 14,
+                          width: 10,
+                          height: 10,
+                          bgcolor: 'background.paper',
+                          transform: 'translateY(-50%) rotate(45deg)',
+                          zIndex: 0,
+                        },
+                      },
+                    }}
+                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                  >
+                    <MenuItem onClick={() => { handleNavigation("/profile"); setAnchorEl(null); }}>
+                      <ListItemIcon>
+                        <AccountCircleIcon fontSize="small" sx={{ color: "#8b3e3e" }} />
+                      </ListItemIcon>
+                      Mi Perfil
+                    </MenuItem>
+                    <MenuItem onClick={() => { handleLogout(); setAnchorEl(null); }}>
+                      <ListItemIcon>
+                        <Logout fontSize="small" sx={{ color: "#8b3e3e" }} />
+                      </ListItemIcon>
+                      Cerrar Sesión
+                    </MenuItem>
+                  </Menu>
                 </>
               ) : (
                 <>
@@ -271,6 +281,18 @@ const Header = () => {
           <IconButton onClick={() => setMenuOpen(!menuOpen)} sx={{ color: "#8b3e3e" }}>
             {menuOpen ? <CloseIcon /> : <MenuIcon />}
           </IconButton>
+        )}
+
+        {/* Underline Indicator */}
+        {!isMobile && (
+          <Box
+            className="absolute bottom-[18px] h-[3px] bg-[#8b3e3e] transition-all duration-300 ease-out rounded-t-full"
+            style={{
+              width: underlineStyle.width,
+              left: underlineStyle.left,
+              opacity: underlineStyle.opacity ?? 0,
+            }}
+          />
         )}
       </Box>
 

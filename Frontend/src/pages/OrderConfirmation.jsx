@@ -21,41 +21,38 @@ const OrderConfirmation = () => {
   return (
     <Box
       sx={{
-        minHeight: "100vh",
-        backgroundColor: "#fef7f5",
+        minHeight: "calc(100vh - 80px)", // Adjust height to account for header if needed, or just auto
+        backgroundColor: "#ffffff",
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start", // Align to top
         justifyContent: "center",
-        py: 8,
+        pt: 8, // Add some top padding
+        pb: 8,
         px: 2,
         fontFamily: "'Montserrat', sans-serif",
       }}
     >
-      <Paper
-        elevation={3}
+      <Box
         sx={{
-          maxWidth: "600px",
+          maxWidth: "500px", // Más pequeño
           width: "100%",
-          p: 6,
-          borderRadius: "16px",
           textAlign: "center",
-          backgroundColor: "#fff",
         }}
       >
         <CheckCircle
           sx={{
-            fontSize: "80px",
+            fontSize: "64px", // Icono más pequeño
             color: "#4caf50",
-            mb: 3,
+            mb: 2,
           }}
         />
 
         <Typography
-          variant="h4"
+          variant="h5" // Título más pequeño
           sx={{
             fontWeight: "700",
             color: "#2d2d2d",
-            mb: 2,
+            mb: 1,
           }}
         >
           ¡Pedido Confirmado!
@@ -64,21 +61,21 @@ const OrderConfirmation = () => {
         <Typography
           sx={{
             color: "#666",
-            fontSize: "16px",
-            mb: 4,
-            lineHeight: 1.6,
+            fontSize: "14px", // Texto más pequeño
+            mb: 3,
+            lineHeight: 1.5,
           }}
         >
-          Tu pedido ha sido procesado exitosamente. 
-          Recibirás una confirmación en tu correo electrónico.
+          Tu pedido ha sido procesado exitosamente. Recibirás una confirmación en tu
+          correo electrónico.
         </Typography>
 
         {/* Detalles del pedido */}
         {orderDetails && (
           <Box
             sx={{
-              backgroundColor: "#f5f5f5",
-              borderRadius: "8px",
+              backgroundColor: "#f9f9f9", // Fondo muy sutil
+              borderRadius: "12px",
               p: 3,
               mb: 3,
             }}
@@ -86,7 +83,7 @@ const OrderConfirmation = () => {
             <Typography
               sx={{
                 color: "#666",
-                fontSize: "14px",
+                fontSize: "13px",
                 mb: 1,
               }}
             >
@@ -95,20 +92,20 @@ const OrderConfirmation = () => {
             <Typography
               sx={{
                 fontWeight: "700",
-                fontSize: "20px",
-                color: "#ff9c9c",
+                fontSize: "18px",
+                color: "#ff9c9c", // Color rosado/rojo suave
                 mb: 2,
               }}
             >
               {orderDetails.id_pedido}
             </Typography>
-            
+
             {paymentDetails && (
               <>
                 <Typography
                   sx={{
                     color: "#666",
-                    fontSize: "14px",
+                    fontSize: "13px",
                     mb: 1,
                   }}
                 >
@@ -117,7 +114,7 @@ const OrderConfirmation = () => {
                 <Typography
                   sx={{
                     fontWeight: "700",
-                    fontSize: "24px",
+                    fontSize: "20px",
                     color: "#2d2d2d",
                   }}
                 >
@@ -128,34 +125,6 @@ const OrderConfirmation = () => {
           </Box>
         )}
 
-        <Box
-          sx={{
-            backgroundColor: "#f5f5f5",
-            borderRadius: "8px",
-            p: 3,
-            mb: 4,
-          }}
-        >
-          <Typography
-            sx={{
-              color: "#666",
-              fontSize: "14px",
-              mb: 1,
-            }}
-          >
-            Gracias por tu compra en
-          </Typography>
-          <Typography
-            sx={{
-              fontWeight: "700",
-              fontSize: "24px",
-              color: "#ff9c9c",
-            }}
-          >
-            Famiglia
-          </Typography>
-        </Box>
-
         <Box sx={{ display: "flex", gap: 2, justifyContent: "center" }}>
           <Button
             variant="contained"
@@ -163,14 +132,16 @@ const OrderConfirmation = () => {
             sx={{
               backgroundColor: "#ff9c9c",
               color: "#fff",
-              px: 4,
-              py: 1.5,
-              fontSize: "14px",
+              px: 3,
+              py: 1,
+              fontSize: "13px",
               fontWeight: "600",
               borderRadius: "8px",
               textTransform: "none",
+              boxShadow: "none",
               "&:hover": {
                 backgroundColor: "#ff7a7a",
+                boxShadow: "none",
               },
             }}
           >
@@ -183,9 +154,9 @@ const OrderConfirmation = () => {
             sx={{
               borderColor: "#ff9c9c",
               color: "#ff9c9c",
-              px: 4,
-              py: 1.5,
-              fontSize: "14px",
+              px: 3,
+              py: 1,
+              fontSize: "13px",
               fontWeight: "600",
               borderRadius: "8px",
               textTransform: "none",
@@ -198,7 +169,7 @@ const OrderConfirmation = () => {
             Ver Carta
           </Button>
         </Box>
-      </Paper>
+      </Box>
     </Box>
   );
 };

@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLoginModal } from '../../context/LoginModalContext';
 
+import { CircularProgress } from '@mui/material';
+
 const ProductCard = ({ product, onAddToCart, showAddButton = true, layout = 'list' }) => {
   const [imageError, setImageError] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   const dispatch = useDispatch();
   const { openLoginModal } = useLoginModal();
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -25,9 +28,18 @@ const ProductCard = ({ product, onAddToCart, showAddButton = true, layout = 'lis
 
   const handleImageError = () => !imageError && setImageError(true);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!isAuthenticated) return openLoginModal();
-    if (onAddToCart) onAddToCart(product);
+    if (onAddToCart) {
+      setIsAdding(true);
+      try {
+        await onAddToCart(product);
+      } catch (error) {
+        console.error("Error adding to cart", error);
+      } finally {
+        setIsAdding(false);
+      }
+    }
   };
 
   const isBestSeller = totalVendido > 5;
@@ -69,14 +81,24 @@ const ProductCard = ({ product, onAddToCart, showAddButton = true, layout = 'lis
                 ${isGrid ? 'w-full py-2 bg-[#fff0f0] text-[#8b3e3e] hover:text-white hover:shadow-lg hover:shadow-red-900/20' : 'px-6 py-2.5 bg-[#fff0f0] text-[#8b3e3e] hover:text-white border border-red-100 hover:border-[#8b3e3e]'}
               `}
               onClick={handleAddToCart}
+              disabled={isAdding}
             >
               <span className="relative z-10 flex items-center justify-center gap-2">
-                Añadir al carrito
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
+                {isAdding ? (
+                  <>
+                    <CircularProgress size={16} color="inherit" />
+                    Agregando...
+                  </>
+                ) : (
+                  <>
+                    Añadir al carrito
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </>
+                )}
               </span>
-              <div className="absolute inset-0 bg-[#8b3e3e] transform scale-x-0 group-hover/btn:scale-x-100 transition-transform origin-left duration-300 ease-out"></div>
+              {!isAdding && <div className="absolute inset-0 bg-[#8b3e3e] transform scale-x-0 group-hover/btn:scale-x-100 transition-transform origin-left duration-300 ease-out"></div>}
             </button>
           )}
         </div>

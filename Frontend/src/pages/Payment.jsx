@@ -105,7 +105,7 @@ const Payment = () => {
       console.error("Error al procesar el pago:", error);
       setApiError(
         error.response?.data?.error ||
-          "Error al procesar el pago. Por favor, intente nuevamente."
+        "Error al procesar el pago. Por favor, intente nuevamente."
       );
     } finally {
       setIsLoading(false);
@@ -113,357 +113,386 @@ const Payment = () => {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        backgroundColor: palette.lightPeach, // Color de fondo principal
-        pt: 8,
-        pb: 6,
-        px: 2,
-        fontFamily: "'Montserrat', sans-serif", // Asegúrate de que esta fuente esté cargada
-      }}
-    >
-      <Box sx={{ maxWidth: "1000px", margin: "0 auto" }}>
-        <Typography
-          variant="h4"
+    <Box sx={{ maxWidth: "1400px", margin: "0 auto" }}>
+      <Typography
+        variant="h4"
+        sx={{
+          fontWeight: "700",
+          color: palette.darkBrown, // Título principal
+          mb: 4,
+          pt: 4,
+          textAlign: "center",
+        }}
+      >
+        Método de Pago
+      </Typography>
+
+      {/* Mensaje de error de API */}
+      {apiError && (
+        <Alert severity="error" sx={{ mb: 3, borderRadius: "8px" }}>
+          {apiError}
+        </Alert>
+      )}
+
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "1.5fr 1fr" },
+          gap: { xs: 3, md: 4 },
+        }}
+      >
+        {/* Columna Izquierda: Resumen del Pedido */}
+        <Paper
+          elevation={6}
           sx={{
-            fontWeight: "700",
-            color: palette.darkBrown, // Título principal
-            mb: 4,
-            textAlign: "center",
+            p: { xs: 3, md: 4 },
+            borderRadius: "18px",
+            background: "linear-gradient(145deg, #fcfcfcff, #f7f4efff)",
+            height: "fit-content", // Allow height to adjust to content
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: `
+                8px 8px 20px rgba(0, 0, 0, 0.15), 
+                -4px -4px 10px rgba(255, 255, 255, 0.9)
+              `,
+            transition: "all 0.3s ease",
+            "&:hover": {
+              transform: "translateY(-4px)",
+              boxShadow: `
+                  10px 10px 25px rgba(0, 0, 0, 0.2), 
+                  -5px -5px 12px rgba(255, 255, 255, 0.95)
+                `,
+            },
           }}
         >
-          Completar Pago
-        </Typography>
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: "600", mb: 2, color: palette.darkBrown }}
+          >
+            Resumen del Pedido
+          </Typography>
 
-        {/* Mensaje de error de API */}
-        {apiError && (
-          <Alert severity="error" sx={{ mb: 3, borderRadius: "8px" }}>
-            {apiError}
-          </Alert>
-        )}
+          <Box sx={{ mb: 2 }}>
+            <Typography
+              sx={{
+                fontWeight: "500",
+                color: "#666",
+                fontSize: "14px",
+              }}
+            >
+              ID del Pedido:{" "}
+              <strong style={{ color: palette.darkBrown }}>{orderId}</strong>
+            </Typography>
+          </Box>
 
-        <Box
-          sx={{
+          <Divider sx={{ my: 2 }} />
+
+          {/* Lista de productos en 2 columnas */}
+          <Box sx={{
+            mb: 3,
+            // flex: 1, // Removed to prevent stretching and empty space
+            maxHeight: "260px", // Limit height to show approx 4 items
+            overflowY: "auto",
+            pr: 1,
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-            gap: { xs: 3, md: 4 },
-          }}
-        >
-          {/* Columna Izquierda: Método de Pago */}
-          <Paper
-            elevation={3}
-            sx={{
-              p: { xs: 3, md: 4 },
-              borderRadius: "16px", // Bordes más suaves
-              backgroundColor: palette.white,
-              boxShadow: "0px 10px 25px -10px rgba(0,0,0,0.1)",
-            }}
-          >
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: "600", mb: 3, color: palette.darkBrown }}
-            >
-              Seleccionar Método de Pago
-            </Typography>
-
-            <FormControl component="fieldset" sx={{ width: "100%", mb: 3 }}>
-              <RadioGroup
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                sx={{ gap: 2 }} // Espacio entre opciones
-              >
-                {/* --- Opción Yape --- */}
-                <FormControlLabel
-                  value="yape"
-                  control={
-                    <Radio
-                      sx={{
-                        color: palette.orange,
-                        "&.Mui-checked": { color: palette.rustRed },
-                      }}
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                      <Box
-                        component="img"
-                        src={yapeLogo}
-                        alt="Yape"
-                        sx={{ width: 24, height: 24 }}
-                      />
-                      <Typography sx={{ fontWeight: "500", color: palette.darkBrown }}>
-                        Yape
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{
-                    border:
-                      paymentMethod === "yape"
-                        ? `2px solid ${palette.rustRed}`
-                        : `1px solid #ddd`,
-                    borderRadius: "12px",
-                    p: 1.5,
-                    m: 0, // Resetear margen
-                    transition: "all 0.2s ease",
-                    backgroundColor:
-                      paymentMethod === "yape"
-                        ? `${palette.rustRed}1A` // Tinte sutil
-                        : palette.white,
-                  }}
-                />
-                {/* --- Opción Plin --- */}
-                <FormControlLabel
-                  value="plin"
-                  control={
-                    <Radio
-                      sx={{
-                        color: palette.orange,
-                        "&.Mui-checked": { color: palette.rustRed },
-                      }}
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                       <Box
-                        component="img"
-                        src={plinLogo}
-                        alt="Plin"
-                        sx={{ width: 24, height: 24 }}
-                      />
-                      <Typography sx={{ fontWeight: "500", color: palette.darkBrown }}>
-                        Plin
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{
-                    border:
-                      paymentMethod === "plin"
-                        ? `2px solid ${palette.rustRed}`
-                        : `1px solid #ddd`,
-                    borderRadius: "12px",
-                    p: 1.5,
-                    m: 0, // Resetear margen
-                    transition: "all 0.2s ease",
-                    backgroundColor:
-                      paymentMethod === "plin"
-                        ? `${palette.rustRed}1A` // Tinte sutil
-                        : palette.white,
-                  }}
-                />
-              </RadioGroup>
-            </FormControl>
-
-            <Divider sx={{ my: 3 }} />
-
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: "600", mb: 3, color: palette.darkBrown }}
-            >
-              Información de Pago
-            </Typography>
-
-            <TextField
-              fullWidth
-              label="Número de Teléfono"
-              placeholder="987654321"
-              value={phoneNumber}
-              onChange={(e) => {
-                setPhoneNumber(e.target.value);
-                if (errors.phoneNumber) {
-                  setErrors({ ...errors, phoneNumber: "" });
-                }
-              }}
-              error={!!errors.phoneNumber}
-              helperText={errors.phoneNumber}
-              sx={{
-                mb: 3,
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: "12px",
-                  "&.Mui-focused fieldset": {
-                    borderColor: palette.rustRed, // Color al enfocar
-                  },
-                },
-                "& .MuiInputLabel-root.Mui-focused": {
-                  color: palette.rustRed, // Color de label al enfocar
-                },
-              }}
-            />
-
-            <TextField
-              fullWidth
-              label="Código de Verificación"
-              placeholder="123456"
-              value={verificationCode}
-              onChange={(e) => {
-                setVerificationCode(e.target.value);
-                if (errors.verificationCode) {
-                  setErrors({ ...errors, verificationCode: "" });
-                }
-              }}
-              error={!!errors.verificationCode}
-              helperText={errors.verificationCode}
-              sx={{
-                mb: 3,
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: "12px",
-                  "&.Mui-focused fieldset": {
-                    borderColor: palette.rustRed, // Color al enfocar
-                  },
-                },
-                "& .MuiInputLabel-root.Mui-focused": {
-                  color: palette.rustRed, // Color de label al enfocar
-                },
-              }}
-            />
-
-            <Button
-              fullWidth
-              variant="contained"
-              onClick={handlePayment}
-              disabled={isLoading}
-              sx={{
-                backgroundColor: palette.rustRed, // Botón primario
-                color: palette.white,
-                py: 1.5,
-                fontSize: "16px",
-                fontWeight: "600",
-                borderRadius: "12px",
-                textTransform: "none",
-                boxShadow: "0px 4px 15px -5px rgba(175, 68, 47, 0.7)",
-                "&:hover": {
-                  backgroundColor: palette.darkBrown, // Hover más oscuro
-                  boxShadow: "none",
-                },
-                "&:disabled": {
-                  backgroundColor: palette.lightPeach, // Color deshabilitado
-                  color: palette.darkBrown,
-                  opacity: 0.7
-                },
-              }}
-            >
-              {isLoading ? (
-                <>
-                  <CircularProgress size={20} sx={{ mr: 1, color: palette.white }} />
-                  Procesando...
-                </>
-              ) : (
-                "Confirmar Pago"
-              )}
-            </Button>
-          </Paper>
-
-          {/* Columna Derecha: Resumen del Pedido */}
-          <Paper
-            elevation={3}
-            sx={{
-              p: { xs: 3, md: 4 },
-              borderRadius: "16px",
-              backgroundColor: palette.white,
-              height: "fit-content",
-              boxShadow: "0px 10px 25px -10px rgba(0,0,0,0.1)",
-            }}
-          >
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: "600", mb: 2, color: palette.darkBrown }}
-            >
-              Resumen del Pedido
-            </Typography>
-
-            <Box sx={{ mb: 2 }}>
-              <Typography
+            gridTemplateColumns: "1fr 1fr",
+            gap: 2
+          }}>
+            {items.map((item) => (
+              <Box
+                key={item.id_detalle}
                 sx={{
-                  fontWeight: "500",
-                  color: "#666",
-                  fontSize: "14px",
+                  display: "flex",
+                  flexDirection: "column",
+                  p: 2,
+                  borderRadius: "12px",
+                  border: "1px solid #f0f0f0",
+                  backgroundColor: "#fff",
+                  transition: "box-shadow 0.2s",
+                  "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }
                 }}
               >
-                ID del Pedido:{" "}
-                <strong style={{ color: palette.darkBrown }}>{orderId}</strong>
-              </Typography>
-            </Box>
-
-            <Divider sx={{ my: 2 }} />
-
-            {/* Lista de productos */}
-            <Box sx={{ mb: 3, maxHeight: "300px", overflowY: "auto", pr: 1 }}>
-              {items.map((item) => (
-                <Box
-                  key={item.id_detalle}
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    py: 2,
-                    borderBottom: "1px solid #f0f0f0",
-                    "&:last-child": {
-                      borderBottom: "none",
-                      pb: 0
-                    }
-                  }}
-                >
-                  <Box sx={{ flex: 1, mr: 2 }}>
-                    <Typography sx={{ fontWeight: "600", fontSize: "15px", color: palette.darkBrown }}>
-                      {item.nombre}
-                    </Typography>
-                    <Typography
-                      sx={{ color: "#888", fontSize: "13px", mt: 0.5 }}
-                    >
-                      Cantidad: {item.cantidad}
-                    </Typography>
-                  </Box>
-                  <Typography sx={{ fontWeight: "600", color: palette.rustRed, fontSize: "15px" }}>
-                    S/{item.subtotal.toFixed(2)}
+                <Box sx={{ mb: 1 }}>
+                  <Typography sx={{ fontWeight: "600", fontSize: "14px", color: palette.darkBrown, lineHeight: 1.3 }}>
+                    {item.nombre}
+                  </Typography>
+                  <Typography
+                    sx={{ color: "#888", fontSize: "12px", mt: 0.5 }}
+                  >
+                    Cant: {item.cantidad}
                   </Typography>
                 </Box>
-              ))}
-            </Box>
+                <Typography sx={{ fontWeight: "700", color: palette.rustRed, fontSize: "15px", mt: "auto", textAlign: "right" }}>
+                  S/{item.subtotal.toFixed(2)}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
 
-            <Divider sx={{ my: 2 }} />
+          <Divider sx={{ my: 2 }} />
 
-            {/* Total */}
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mt: 3,
-              }}
-            >
-              <Typography sx={{ fontWeight: "700", fontSize: "18px", color: palette.darkBrown }}>
-                Total a Pagar:
-              </Typography>
-              <Typography
-                sx={{
-                  fontWeight: "700",
-                  fontSize: "24px",
-                  color: palette.brightRed, // Total destacado
-                }}
-              >
-                S/{totalAmount.toFixed(2)}
-              </Typography>
-            </Box>
-          </Paper>
-        </Box>
-
-        {/* Botón Volver */}
-        <Box sx={{ textAlign: "center", mt: 4 }}>
-          <Button
-            onClick={() => navigate("/cart")}
+          {/* Total */}
+          <Box
             sx={{
-              color: palette.rustRed, // Color de acento
-              textTransform: "none",
-              fontWeight: "600",
-              borderRadius: "8px",
-              "&:hover": {
-                backgroundColor: `${palette.rustRed}1A`, // Fondo sutil al pasar el mouse
-              },
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mt: 3,
             }}
           >
-            ← Volver al Carrito
+            <Typography sx={{ fontWeight: "700", fontSize: "18px", color: palette.darkBrown }}>
+              Total a Pagar:
+            </Typography>
+            <Typography
+              sx={{
+                fontWeight: "700",
+                fontSize: "24px",
+                color: palette.brightRed, // Total destacado
+              }}
+            >
+              S/{totalAmount.toFixed(2)}
+            </Typography>
+          </Box>
+        </Paper>
+
+        {/* Columna Derecha: Método de Pago */}
+        <Paper
+          elevation={6}
+          sx={{
+            p: { xs: 3, md: 4 },
+            borderRadius: "18px",
+            background: "linear-gradient(145deg, #fefcfcff, #f2f0ed)",
+            height: "fit-content", // Allow height to adjust to content
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: `
+                8px 8px 20px rgba(0, 0, 0, 0.15), 
+                -4px -4px 10px rgba(255, 255, 255, 0.8)
+              `,
+            transition: "all 0.3s ease",
+            "&:hover": {
+              transform: "translateY(-4px)",
+              boxShadow: `
+                  10px 10px 25px rgba(0, 0, 0, 0.2), 
+                  -5px -5px 12px rgba(255, 255, 255, 0.9)
+                `,
+            },
+          }}
+        >
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: "600", mb: 3, color: palette.darkBrown }}
+          >
+            Seleccionar Método de Pago
+          </Typography>
+
+          <FormControl component="fieldset" sx={{ width: "100%", mb: 3 }}>
+            <RadioGroup
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              sx={{ gap: 2 }} // Espacio entre opciones
+            >
+              {/* --- Opción Yape --- */}
+              <FormControlLabel
+                value="yape"
+                control={
+                  <Radio
+                    sx={{
+                      color: palette.orange,
+                      "&.Mui-checked": { color: palette.rustRed },
+                    }}
+                  />
+                }
+                label={
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Box
+                      component="img"
+                      src={yapeLogo}
+                      alt="Yape"
+                      sx={{ width: 24, height: 24 }}
+                    />
+                    <Typography sx={{ fontWeight: "500", color: palette.darkBrown }}>
+                      Yape
+                    </Typography>
+                  </Box>
+                }
+                sx={{
+                  width: "280px", // Fixed width for better proportion
+                  border:
+                    paymentMethod === "yape"
+                      ? `2px solid ${palette.rustRed}`
+                      : `1px solid #ddd`,
+                  borderRadius: "12px",
+                  p: 1.5,
+                  m: 0, // Resetear margen
+                  transition: "all 0.2s ease",
+                  backgroundColor:
+                    paymentMethod === "yape"
+                      ? `${palette.rustRed}1A` // Tinte sutil
+                      : palette.white,
+                }}
+              />
+              {/* --- Opción Plin --- */}
+              <FormControlLabel
+                value="plin"
+                control={
+                  <Radio
+                    sx={{
+                      color: palette.orange,
+                      "&.Mui-checked": { color: palette.rustRed },
+                    }}
+                  />
+                }
+                label={
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Box
+                      component="img"
+                      src={plinLogo}
+                      alt="Plin"
+                      sx={{ width: 24, height: 24 }}
+                    />
+                    <Typography sx={{ fontWeight: "500", color: palette.darkBrown }}>
+                      Plin
+                    </Typography>
+                  </Box>
+                }
+                sx={{
+                  width: "280px", // Fixed width for better proportion
+                  border:
+                    paymentMethod === "plin"
+                      ? `2px solid ${palette.rustRed}`
+                      : `1px solid #ddd`,
+                  borderRadius: "12px",
+                  p: 1.5,
+                  m: 0, // Resetear margen
+                  transition: "all 0.2s ease",
+                  backgroundColor:
+                    paymentMethod === "plin"
+                      ? `${palette.rustRed}1A` // Tinte sutil
+                      : palette.white,
+                }}
+              />
+            </RadioGroup>
+          </FormControl>
+
+          <Divider sx={{ my: 3 }} />
+
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: "600", mb: 3, color: palette.darkBrown }}
+          >
+            Información de Pago
+          </Typography>
+
+          <TextField
+            fullWidth
+            label="Número de Teléfono"
+            placeholder="987654321"
+            value={phoneNumber}
+            onChange={(e) => {
+              setPhoneNumber(e.target.value);
+              if (errors.phoneNumber) {
+                setErrors({ ...errors, phoneNumber: "" });
+              }
+            }}
+            error={!!errors.phoneNumber}
+            helperText={errors.phoneNumber}
+            sx={{
+              mb: 3,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "12px",
+                "&.Mui-focused fieldset": {
+                  borderColor: palette.rustRed, // Color al enfocar
+                },
+              },
+              "& .MuiInputLabel-root.Mui-focused": {
+                color: palette.rustRed, // Color de label al enfocar
+              },
+            }}
+          />
+
+          <TextField
+            fullWidth
+            label="Código de Verificación"
+            placeholder="123456"
+            value={verificationCode}
+            onChange={(e) => {
+              setVerificationCode(e.target.value);
+              if (errors.verificationCode) {
+                setErrors({ ...errors, verificationCode: "" });
+              }
+            }}
+            error={!!errors.verificationCode}
+            helperText={errors.verificationCode}
+            sx={{
+              mb: 3,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "12px",
+                "&.Mui-focused fieldset": {
+                  borderColor: palette.rustRed, // Color al enfocar
+                },
+              },
+              "& .MuiInputLabel-root.Mui-focused": {
+                color: palette.rustRed, // Color de label al enfocar
+              },
+            }}
+          />
+
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={handlePayment}
+            disabled={isLoading}
+            sx={{
+              backgroundColor: palette.rustRed, // Botón primario
+              color: palette.white,
+              py: 1.5,
+              fontSize: "16px",
+              fontWeight: "600",
+              borderRadius: "12px",
+              textTransform: "none",
+              boxShadow: "0px 4px 15px -5px rgba(175, 68, 47, 0.7)",
+              "&:hover": {
+                backgroundColor: palette.darkBrown, // Hover más oscuro
+                boxShadow: "none",
+              },
+              "&:disabled": {
+                backgroundColor: palette.lightPeach, // Color deshabilitado
+                color: palette.darkBrown,
+                opacity: 0.7
+              },
+              mt: "auto"
+            }}
+          >
+            {isLoading ? (
+              <>
+                <CircularProgress size={20} sx={{ mr: 1, color: palette.white }} />
+                Procesando...
+              </>
+            ) : (
+              "Confirmar Pago"
+            )}
           </Button>
-        </Box>
+        </Paper>
+      </Box>
+
+      {/* Botón Volver */}
+      <Box sx={{ textAlign: "center", mt: 4 }}>
+        <Button
+          onClick={() => navigate("/cart")}
+          sx={{
+            color: palette.rustRed, // Color de acento
+            textTransform: "none",
+            fontWeight: "600",
+            borderRadius: "8px",
+            mb: 4,
+            "&:hover": {
+              backgroundColor: `${palette.rustRed}1A`, // Fondo sutil al pasar el mouse
+            },
+          }}
+        >
+          ← Volver al Carrito
+        </Button>
       </Box>
     </Box>
   );

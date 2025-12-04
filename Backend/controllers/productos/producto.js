@@ -4,6 +4,13 @@ export const getProductos = async (req, res) => {
     try {
         // Obtener productos con información de ventas y stock
         const productos = await prisma.producto.findMany({
+            where: {
+                stock: {
+                    cantidad: {
+                        gt: 0
+                    }
+                }
+            },
             include: {
                 categoria: true,
                 stock: true,
@@ -69,7 +76,14 @@ export const getProductosByCategoria = async (req, res) => {
     try {
         const { id_categoria } = req.params;
         const productos = await prisma.producto.findMany({
-            where: { id_categoria: BigInt(id_categoria) },
+            where: { 
+                id_categoria: BigInt(id_categoria),
+                stock: {
+                    cantidad: {
+                        gt: 0
+                    }
+                }
+            },
             include: {
                 stock: true
             }
